@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Library.fs" />
+    <Compile Include="./Entities.fs" />
+    <Compile Include="./DbServices/UserService.fs" />
+    <Compile Include="./DbServices/PerfReportService.fs" />
+    <Compile Include="./DbServices/WorkerTaskService.fs" />
+    <Compile Include="./DatabaseOperation.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Giraffe" Version="0.1.0-beta-300" />
+    <PackageReference Include="Marten" Version="2.3.2" />
+    <PackageReference Include="Otp.NET" Version="1.1.0" />
+    <PackageReference Include="Scrypt.NET" Version="1.3.0" />
+    <PackageReference Include="Fable.JsonConverter" Version="1.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\public-model\public-model.fsproj" />
+  </ItemGroup>
+
+</Project>

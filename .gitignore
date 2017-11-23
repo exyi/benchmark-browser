@@ -1,0 +1,6 @@
+/spec/*/*-crop.pdf
+/spec/*/spec.pdf
+/spec/*/spec.html
+
+bin/
+obj/

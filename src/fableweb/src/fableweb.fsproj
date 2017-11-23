@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="./Utils.fs"/>
+    <Compile Include="./FormGenerator.fs"/>
+    <Compile Include="./ApiClient.fs" />
+    <!-- Global to the app -->
+    <Compile Include="./Admin/AdminGlobal.fs"/>
+    <Compile Include="Global.fs" />
+
+    <Compile Include="./Admin/EditProject.fs"/>
+
+    <!-- Info -->
+    <Compile Include="Info/View.fs" />
+    <!-- Counter -->
+    <Compile Include="Counter/Types.fs" />
+    <Compile Include="Counter/State.fs" />
+    <Compile Include="Counter/View.fs" />
+    <!-- Home -->
+    <Compile Include="Home/Types.fs" />
+    <Compile Include="Home/State.fs" />
+    <Compile Include="Home/View.fs" />
+    <!-- Navbar -->
+    <Compile Include="Navbar/View.fs" />
+    <Compile Include="./LoginBox.fs" />
+    <!-- App -->
+    <Compile Include="Types.fs" />
+    <Compile Include="State.fs" />
+    <Compile Include="App.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\public-model\public-model.fsproj" />
+  </ItemGroup>
+  <Import Project="..\.paket\Paket.Restore.targets" />
+</Project>

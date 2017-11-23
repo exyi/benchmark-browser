@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="DataClasses.fs"/>
+    <Compile Include="./RepoManager.fs"/>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\public-model\public-model.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.10.10" />
+    <PackageReference Include="Fable.JsonConverter" Version="1.0.2" />
+    <PackageReference Include="Fake.DotNet.NuGet" Version="5.0.0-beta010" />
+    <PackageReference Include="Fake.Tools.Git" Version="5.0.0-beta010" />
+    <!-- <PackageReference Include="Http.fs" Version="4.1.2" /> -->
+    <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
+    <!-- <PackageReference Include="FAKE" Version="5.0.0-beta010" /> -->
+    <!-- <PackageReference Include="FSharp.Data" Version="2.4.2" /> -->
+    <PackageReference Include="Otp.NET" Version="1.1.0" />
+  </ItemGroup>
+
+</Project>

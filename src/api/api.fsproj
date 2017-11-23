@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="./Authentication.fs" />
+    <Compile Include="./TestReports.fs" />
+    <Compile Include="./WorkerHub.fs" />
+    <!-- <Compile Include="./Reports.fs" /> -->
+    <Compile Include="./AdminHub.fs" />
+    <Compile Include="ApiRouter.fs" />
+    <Compile Include="Startup.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fable.Remoting.Giraffe" Version="0.1.2-pre" />
+    <PackageReference Include="Giraffe" Version="0.1.0-beta-300" />
+    <PackageReference Include="Microsoft.AspNetCore.All" Version="2.0.0" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="5.1.4" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="5.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\data-access\data-access.fsproj" />
+  </ItemGroup>
+
+</Project>

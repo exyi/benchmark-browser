@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Library.fs" />
+    <Compile Include="./PerfReportModel.fs" />
+    <Compile Include="./ProjectManagement.fs" />
+    <Compile Include="./WorkerModel.fs" />
+  </ItemGroup>
+
+</Project>

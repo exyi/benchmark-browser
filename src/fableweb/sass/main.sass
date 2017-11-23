@@ -1,0 +1,63 @@
+// Colors
+$purple: #7a325d
+$primary: $purple
+$black: #202020
+$white: #ffffff
+
+@import '../node_modules/bulma/bulma'
+
+.navbar-bg
+  background-color: $black
+  color: $white
+  .columns
+    padding: 1em
+  .title
+    font-weight: 600
+
+  .column.login
+    text-align: right
+
+  .login-box
+    text-align: left
+    background-color: $black
+    position: absolute
+    width: 300px
+    left: auto
+    right: auto
+    top: 0px
+    z-index: 1000
+    padding: 25px
+    padding-top: 5em
+
+    label
+      display: block
+      width: calc(300px - 50px)
+      position: relative
+
+      input
+        position: absolute
+        right: 0
+        top: 0
+
+label.form-element
+  display: block
+
+.form-inner
+  // margin-left: 1em
+
+.form-inner > *:not(h3)
+  border-left: 1px solid
+  padding-left: 1em
+  margin-left: 1em
+  border-color: grey
+
+
+.form-inner > h3:nth-child(1)
+  // margin-left: -2em
+
+
+.tmp-password-warning
+  color: $purple
+
+
+

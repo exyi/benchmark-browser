@@ -1,0 +1,7 @@
+{
+	"ApiEndpoint": "http://localhost:5000",
+    	"ApiUser": "exyi@exyi.cz",
+    	"ApiPassword": "test-password",
+    	"ApiOtp": null,
+    	"ClonedRepositories": "/tmp/perftests-worker-repos"
+}
