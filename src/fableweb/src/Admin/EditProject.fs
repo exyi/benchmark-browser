@@ -16,7 +16,7 @@ let renderView (model: EditProjectModel) (dispatch: UpdateMsg<EditProjectModel> 
         let error, cmd =
             if model.Id.IsSome then
                 UIMessage.Error "edit unsupported", Cmd.none
-            else if String.IsNullOrWhiteSpace model.Form.Name then
+            else if String.IsNullOrWhiteSpace model.Form.Title then
                 UIMessage.Error "name is required", Cmd.none
             else
                 UIMessage.Info "Request sent", Cmd.ofPromise
@@ -24,7 +24,7 @@ let renderView (model: EditProjectModel) (dispatch: UpdateMsg<EditProjectModel> 
                     (fun a ->
                         match a with
                         | Error e -> UIMessage.Error (sprintf "Server says no: %s" e) |> updateMsg
-                        | Ok o -> UIMessage.Success (sprintf "Ok, test %s added." model.Form.Name) |> updateMsg |> UpdateMsg'.combine clearFormMsg
+                        | Ok o -> UIMessage.Success (sprintf "Ok, test %s added." model.Form.Title) |> updateMsg |> UpdateMsg'.combine clearFormMsg
                     )
                     (updateMsg << UIMessage.Error << (fun e ->
                         sprintf "Hmm, error %A" e))

@@ -56,6 +56,10 @@ let rec createDefault (modelType: System.Type) =
     else
         failwith "Can not create default of type";
 
+[<PassGenericsAttribute>]
+let createDefaultType<'a> () =
+    createDefault (typeof<'a>) :?> 'a
+
 
 let rec createFormCore (modelType:System.Type) (model: obj) (dispatch: UpdateMsg<obj> -> unit) =
 

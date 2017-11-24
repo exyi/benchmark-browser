@@ -8,8 +8,8 @@
     <Compile Include="Library.fs" />
     <Compile Include="./Entities.fs" />
     <Compile Include="./DbServices/UserService.fs" />
-    <Compile Include="./DbServices/PerfReportService.fs" />
     <Compile Include="./DbServices/WorkerTaskService.fs" />
+    <Compile Include="./DbServices/PerfReportService.fs" />
     <Compile Include="./DatabaseOperation.fs" />
   </ItemGroup>
 

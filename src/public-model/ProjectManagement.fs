@@ -23,6 +23,7 @@ type BuildOptions = {
     UseCommitPreprocParams: bool
 }
 
+[<RequireQualifiedAccessAttribute>]
 type TestExecutionMethod =
     | ExecScript of exec: string
     | DotnetRun of BuildOptions * arguments: string
@@ -39,23 +40,32 @@ type TestDefinition = {
 }
 
 type TestDefFormModel = {
-    Name: string
+    Title: string
+    FriendlyId: string
     Definition: TestDefinition
 }
+
 
 [<CLIMutableAttribute>]
 type TestDefEntity = {
     Id: Guid
-    Name: string
+    FriendlyId: string
+    Title: string
     OwnerId: Guid
     TestDefinition: TestDefinition
 }
 
 type ProjectListItem = {
     Id: Guid
+    FriendlyId: string
     Name: string
     ProjectRepo: string
     ReportCount: int
     TasksRun: int
     TasksQueued: int
+}
+
+
+type DashboardModel = {
+    TestDef: TestDefEntity
 }

@@ -6,6 +6,7 @@ open Microsoft.AspNetCore.Http
 open Giraffe
 open Giraffe.Tasks
 open DataAccess
+open Authentication
 
 let getMeSomeWork (context:HttpContext) () =
     DatabaseOperation.execOperation context (fun s -> task {
@@ -20,3 +21,7 @@ let getMeSomeWork (context:HttpContext) () =
 
 let pushWorkStatus (context:HttpContext) (status: WorkStatusInfo) =
     DatabaseOperation.execOperation context (WorkerTaskService.pushStateUpdate status)
+
+let enqueueWorkerTask context (form: WorkerQueueItemFormModel) =
+    let uid = getCurrentUserId context
+    DatabaseOperation.execOperation context (WorkerTaskService.enqueueWorkerTask uid form)

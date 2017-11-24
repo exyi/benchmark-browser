@@ -9,6 +9,7 @@ open System.Net.Cache
 open Fable.Core
 open System
 open Fable.Helpers.React
+open PublicModel
 
 let endpoint = "http://localhost:5000"
 
@@ -72,3 +73,9 @@ let createTaskDefinition (form:PublicModel.ProjectManagement.TestDefFormModel) :
 
 let listProjects () : JS.Promise<PublicModel.ProjectManagement.ProjectListItem []> =
     execApiRequest "projects" () []
+
+let loadDashboard (id: string) : JS.Promise<Result<PublicModel.ProjectManagement.DashboardModel, string>> =
+    execApiRequest "dashboard" id []
+
+let enqueueTask (data: WorkerModel.WorkerQueueItemFormModel) : JS.Promise<Result<string, string>> =
+    execApiRequest "enqueueTask" data []

@@ -57,6 +57,8 @@ let root model dispatch =
           | Some (m) when m.Id.IsSome && m.Id.Value.ToString() = pid ->
                Admin.EditProject.renderView m (UpdateMsg'.liftSome () >> liftEditProject >> AdminMsg >> dispatch)
           | _ -> str "Loading project..."
+    | Dashboard id -> ProjectDashboard.view model.loginBox.HasRole id model.board (BoardMsg >> dispatch)
+    | EnqueueTask id -> ProjectDashboard.viewEnqueueForm id model.board.NewItemModel (ProjectDashboard.Model.LiftNewItemMsg >> BoardMsg >> dispatch)
 
   div
     []

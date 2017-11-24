@@ -1,6 +1,7 @@
 module PublicModel.WorkerModel
 open System
 open ProjectManagement
+open System
 
 [<RequireQualifiedAccessAttribute>]
 type WorkState =
@@ -18,8 +19,22 @@ type WorkStatusInfo = {
     State: WorkState
 }
 
+type VersionSpecifier =
+    | Latest
+    | GitVersion of string
+with member x.ToVersionString() =
+            match x with
+            | Latest -> "HEAD"
+            | GitVersion str -> str
+
+type WorkerQueueItemFormModel = {
+    TestDefId: string
+    ProjectVersion: VersionSpecifier
+    BenchmarkerVersion: VersionSpecifier
+}
+
 type TaskSpecification = {
-    Id: Guid
+    // Id: Guid
     ProjectId: Guid
     Definition: TestDefinition
     BuildScriptVersion: string

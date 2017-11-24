@@ -9,6 +9,7 @@ type Msg =
   | HomeMsg of UpdateMsg<Home.Types.Model>
   | LoginMsg of UpdateMsg<LoginBox.Model>
   | AdminMsg of UpdateMsg<AdminModel>
+  | BoardMsg of UpdateMsg<ProjectDashboard.Model>
 
 type Model = {
     currentPage: Page
@@ -16,4 +17,5 @@ type Model = {
     home: Home.Types.Model
     loginBox: LoginBox.Model
     admin: AdminModel
+    board: ProjectDashboard.Model
   }

@@ -8,6 +8,7 @@ open Global
 open Types
 open Home.Types
 open Admin.Global
+open Utils
 
 let pageParser: Parser<Page->Page,Page> =
   oneOf [
@@ -17,6 +18,8 @@ let pageParser: Parser<Page->Page,Page> =
     map (Admin AdminPage.NewProject) (s "admin" </> s "newProject")
     // map (Admin AdminPage.NewProject) (s "newProject")
     map (Admin << AdminPage.EditProject) (s "admin" </> s "editProject" </> str)
+    map Dashboard (s "board" </> str)
+    map EnqueueTask (s "board" </> str </> s "enqueue")
   ]
 
 let urlUpdate (result: Option<Page>) model =
@@ -25,7 +28,13 @@ let urlUpdate (result: Option<Page>) model =
     console.error("Error parsing url")
     model,Navigation.modifyUrl (toHash model.currentPage)
   | Some page ->
-      { model with currentPage = page }, []
+      let model  = { model with currentPage = page }
+
+      // Do some special behavior, like loading a model
+      match page with
+      | EnqueueTask id -> { model with board = { model.board with NewItemModel = { ProjectDashboard.initNewItemForm with TestDefId = id } } }, Cmd.none
+      | Dashboard id -> model, Cmd.map Msg.BoardMsg (Cmd.map ProjectDashboard.Model.LiftTestMsg (LoadableData'.loadData (expectResultPromise << ApiClient.loadDashboard) id))
+      | _ -> model, []
 
 let init result =
   let (counter, counterCmd) = Counter.State.init()
@@ -37,7 +46,8 @@ let init result =
         counter = counter
         home = home
         loginBox = loginBox
-        admin = Admin.Global.initState () }
+        admin = Admin.Global.initState ()
+        board = ProjectDashboard.initState }
   model, Cmd.batch [ cmd
                      Cmd.map CounterMsg counterCmd
                      Cmd.map HomeMsg homeCmd
@@ -57,3 +67,6 @@ let update msg model =
   | AdminMsg msg ->
       let (m, cmd) = msg.Invoke model.admin
       { model with admin = m }, Cmd.map AdminMsg cmd
+  | BoardMsg msg ->
+      let (m, cmd) = msg.Invoke model.board
+      { model with board = m }, Cmd.map BoardMsg cmd

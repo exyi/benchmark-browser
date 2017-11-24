@@ -9,6 +9,18 @@ open PublicModel.WorkerModel
 open PublicModel.ProjectManagement
 open ProjectManagement
 open System.Reflection.Metadata
+open Marten
+open PublicModel.ProjectManagement
+open Marten
+open Giraffe.XmlViewEngine
+open System
+open System.Threading.Tasks.Dataflow
+open PublicModel.ProjectManagement
+open UserService
+open PublicModel.WorkerModel
+
+let optionOfNull o =
+    if (obj.ReferenceEquals(o, null)) then None else Some o
 
 let findItemsInQueue (limit:int) (s:IDocumentSession) = task {
     let limitDate = System.DateTime.UtcNow.AddDays(-1.0)
@@ -33,12 +45,48 @@ let pushStateUpdate (info: WorkStatusInfo) (s:IDocumentSession) = task {
     s.Store(entity)
 }
 
+let findDefByFriendlyId id (s: IDocumentSession) =
+    if String.IsNullOrEmpty id then
+        System.Threading.Tasks.Task.FromResult(None)
+    else match Guid.TryParse(id) with
+         | (true, guid) -> s.LoadAsync(guid) |> liftTask optionOfNull
+         | (false, _) -> (query { for t in s.Query<TestDefEntity>() do
+                                  where (t.FriendlyId = id)
+                                  select t }).FirstOrDefaultAsync() |> liftTask optionOfNull
+
 let createTaskDefinition (userId: Guid) (form: TestDefFormModel) (s: IDocumentSession) = task {
     let entity = {
             TestDefEntity.Id = Guid.NewGuid()
             OwnerId = userId
-            Name = form.Name
+            Title = form.Title
+            FriendlyId = form.FriendlyId
             TestDefinition = form.Definition }
-    s.Store(entity)
-    return Ok entity
+    let! existingEntity = findDefByFriendlyId form.FriendlyId s
+    match existingEntity with
+    | None ->
+        s.Store(entity)
+        return Ok entity
+    | Some existingEntity -> return Error (sprintf "Entity with id '%s' already exists (%s)" form.FriendlyId existingEntity.Title)
+}
+
+let enqueueWorkerTask (userId: Guid) (form: WorkerQueueItemFormModel) (s: IDocumentSession) = task {
+    let! projectEntity = findDefByFriendlyId form.TestDefId s
+    match projectEntity with
+    | None -> return Error (sprintf "Test definition '%s' does not exists" form.TestDefId)
+    | Some projectEntity ->
+        let queueItem =
+            {
+                WorkerModel.WorkerQueueItem.Id = Guid.NewGuid()
+                Task =
+                    {
+                        TaskSpecification.ProjectId = projectEntity.Id
+                        Definition = projectEntity.TestDefinition
+                        BuildScriptVersion = form.BenchmarkerVersion.ToVersionString()
+                        ProjectVersion = form.ProjectVersion.ToVersionString()
+                    }
+                Priority = 1.0
+                LastUpdate = DateTime.UtcNow
+            }
+        s.Store(queueItem)
+        return Ok (queueItem.Id.ToString())
 }

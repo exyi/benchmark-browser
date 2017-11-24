@@ -3,6 +3,7 @@ open System
 open Utils
 open Elmish
 open PublicModel.ProjectManagement
+open PublicModel.ProjectManagement
 
 [<RequireQualifiedAccessAttribute>]
 type AdminPage =
@@ -22,11 +23,12 @@ type AdminModel = {
 
 let initEditProjectForm =
     {
-        Name = ""
+        Title = ""
+        FriendlyId = ""
         Definition =
         {
             BenchmarksRepository = "https://github.com/myname/my-benchmarks"
-            BuildScriptCommand = "./build.sh"
+            BuildScriptCommand = TestExecutionMethod.ExecScript "./run.sh"
             ProjectRepository = ProjectRepositoryCloneUrl.IsSubmodule
             ProjectRepoPath = "./path/to/project/submodule"
             ResultsProcessor = ResultsProcessor.BenchmarkDotNet

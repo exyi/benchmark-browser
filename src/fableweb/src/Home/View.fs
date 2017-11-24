@@ -11,7 +11,7 @@ let viewData (model: ProjectListItem []) dispatch =
   div [] (
     model |> Seq.map (fun x ->
       div [ ClassName "box" ] [
-        h3 [] [ a [ Href ("#task/" + x.Id.ToString()) ] [ str x.Name ] ]
+        h3 [] [ a [ Href ("#board/" + x.FriendlyId) ] [ str x.Name ] ]
         div [ ] [ str x.ProjectRepo ]
         div [ ] [ str <| sprintf "%d tasks | %d reports | %d queued" x.TasksRun x.ReportCount x.TasksQueued ]
       ]

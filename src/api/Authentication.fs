@@ -14,7 +14,7 @@ open System.IdentityModel.Tokens.Jwt
 
 
 let getCurrentUserId (ctx: HttpContext) =
-    (ctx.User.Claims |> Seq.find (fun c -> c.Type = JwtRegisteredClaimNames.UniqueName || c.Type = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name")).Value |> Guid.Parse
+    (ctx.User.Claims |> Seq.tryFind (fun c -> c.Type = JwtRegisteredClaimNames.UniqueName || c.Type = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name")) |> Option.map (fun x -> Guid.Parse x.Value) |> Option.defaultValue Guid.Empty
 
 type SecretKey = { Key: SecurityKey }
 let usedSigningAlgo = SecurityAlgorithms.HmacSha256

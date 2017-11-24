@@ -13,6 +13,8 @@ open Giraffe.XmlViewEngine
 open PublicModel.WorkerModel
 open UserService
 open PublicModel.ProjectManagement
+open DataAccess.WorkerTaskService
+open Giraffe.XmlViewEngine
 
 let pushResults userId (importData: PerfReportModel.WorkerSubmission seq) (s: IDocumentSession) = task {
     let usedProjectIds = importData |> Seq.map (fun i -> i.ProjectId) |> Set.ofSeq
@@ -56,7 +58,8 @@ let listTests (s:IDocumentSession) = task {
            |> Seq.map (fun p ->
            {
                ProjectListItem.Id = p.Id
-               Name = p.Name
+               FriendlyId = if String.IsNullOrWhiteSpace p.FriendlyId then p.Id.ToString() else p.FriendlyId
+               Name = p.Title
                ProjectRepo =
                    match p.TestDefinition.ProjectRepository with
                    | ProjectRepositoryCloneUrl.CloneFrom url -> url
@@ -65,4 +68,16 @@ let listTests (s:IDocumentSession) = task {
                TasksRun = 0
                TasksQueued = 0 // queueCounts |> Map.tryFind p.Id |> Option.defaultValue 0
            })
+}
+
+let getDashboard (uid: Guid) (pid:string) (s: IDocumentSession) = task {
+    let! p = findDefByFriendlyId pid s
+    match p with
+    | Some p ->
+        return Ok
+            {
+                DashboardModel.TestDef = p
+            }
+    | None -> return Error ("")
+
 }

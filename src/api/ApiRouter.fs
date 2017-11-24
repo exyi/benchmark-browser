@@ -67,6 +67,8 @@ let webApp : HttpHandler =
         routeCi "/getMeSomeWork" >=> requireAuth ["Worker"; "Valid"] >=> serveFunction (WorkerHub.getMeSomeWork)
         routeCi "/pushWorkStatus" >=> requireAuth ["Worker"; "Valid"] >=> serveFunction (WorkerHub.pushWorkStatus)
         routeCi "/projects" >=> serveGetFunction (TestReports.listProjects)
+        routeCi "/dashboard" >=> serveFunction (TestReports.dashboard)
+        routeCi "/enqueueTask" >=> requireAuth ["Admin"] >=> serveFunction (WorkerHub.enqueueWorkerTask)
 
         subRouteCi "/admin"
             (requireAuth ["Admin"; "Valid"] >=> choose

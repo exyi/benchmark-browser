@@ -8,6 +8,7 @@ open Fable.Helpers.React
 open System.Threading
 open Fable.Import.RemoteDev.MsgTypes
 open Fable.Import.React
+open Fable.PowerPack
 
 
 type UpdateMsg<'a> = | UpdateMsg of ('a -> 'a * Cmd<UpdateMsg<'a>>)
@@ -57,15 +58,15 @@ type LoadableData<'a> =
 
 module LoadableData' =
 
-    let loadData refreshFunction =
+    let loadData refreshFunction arg =
         (Cmd.ofPromise
-            refreshFunction ()
+            refreshFunction arg
             (UpdateMsg'.replace << LoadableData.Loaded)
             (fun e -> UpdateMsg'.replace <| LoadableData.Error (sprintf "Loading erro %s" (e.ToString()))))
 
     let display model dispatch viewData refreshFunction =
         let refreshDispatch () =
-            dispatch (loadData refreshFunction |> UpdateMsg'.execCmd)
+            dispatch (loadData refreshFunction () |> UpdateMsg'.execCmd)
 
         match model with
         | LoadableData.Loading ->
@@ -78,3 +79,16 @@ module LoadableData' =
             viewData data (dispatch << (UpdateMsg'.lift loadedGetter (fun _m x -> LoadableData.Loaded x)))
         | LoadableData.Error error ->
             div [ Props.HTMLAttr.ClassName "notification is-danger network-error" ] [ str error ]
+
+
+let elementIf condition el =
+    if condition then el
+    else str ""
+
+let adminOnlyElement roleOracle = elementIf (roleOracle "Admin")
+
+
+let expectResultPromise (a:Fable.Import.JS.Promise<Result<'a, 'b>>) =
+    a |> Promise.bind (function
+                       | Ok a -> Promise.create(fun resolve _reject -> resolve a)
+                       | Error e -> Promise.create(fun _resolve reject -> reject (System.Exception(e.ToString()))))
