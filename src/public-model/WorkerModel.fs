@@ -53,4 +53,5 @@ type WorkerQueueItem = {
     Task: TaskSpecification
     Priority: float
     mutable LastUpdate: DateTime
+    mutable IsResolved: bool
 }

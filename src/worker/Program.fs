@@ -31,6 +31,8 @@ open Newtonsoft.Json.Linq
 open PublicModel.PerfReportModel
 open System.Collections.Generic
 open Fake.Core.String
+open PublicModel.WorkerModel
+open System.Diagnostics
 
 let getConfig (args: string array) =
     let file = args.[0]
@@ -387,6 +389,7 @@ let main argv =
     let server = createServerFunction config (Some token)
 
     let workItem = grabSomeWork server
+    let stopWatch = Stopwatch.StartNew()
     let result = workItem |> Option.map (fun x -> x.Task) |> Option.map (executeWork config)
 
     let response = result |> Option.map (fun result ->
@@ -400,6 +403,11 @@ let main argv =
         )
         importResults
     )
+
+    workItem |> Option.map (fun x ->
+        do server.Invoke "pushWorkStatus" ({WorkStatusInfo.LogMessages = [||]; State = WorkState.Done; TaskId = x.Id; TimeFromStart = stopWatch.Elapsed}) |> expectOk
+        ()
+    ) |> ignore
 
     printfn "%A" result
 

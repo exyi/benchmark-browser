@@ -29,6 +29,7 @@ let findItemsInQueue (limit:int) (s:IDocumentSession) = task {
     let! queue = (query {
         for i in s.Query<WorkerQueueItem>() do
         where (i.LastUpdate < limitDate)
+        where (not i.IsResolved)
         sortByDescending i.Priority
         take limit }).ToListAsync()
 
@@ -49,6 +50,11 @@ let pushStateUpdate (info: WorkStatusInfo) (s:IDocumentSession) = task {
     // s.Patch<WorkerQueueItem>(info.TaskId).Set("LastUpdate", DateTime.UtcNow)
     let! e = s.LoadAsync<WorkerQueueItem>(info.TaskId)
     e.LastUpdate <- DateTime.UtcNow
+
+    match info.State with
+    | WorkState.Done -> e.IsResolved <- true
+    | _ -> ()
+
     s.Store e
     s.Store(entity)
 }
@@ -94,6 +100,7 @@ let enqueueWorkerTask (userId: Guid) (form: WorkerQueueItemFormModel) (s: IDocum
                     }
                 Priority = 1.0
                 LastUpdate = DateTime.MinValue
+                IsResolved = false
             }
         s.Store(queueItem)
         return Ok (queueItem.Id.ToString())
