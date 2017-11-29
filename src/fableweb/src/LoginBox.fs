@@ -77,7 +77,7 @@ let tryLogin (data, result) =
 
 let renderDialog (logindata, validationResult) (dispatch: UpdateMsg<DialogModel> -> unit) =
     div [ ] [
-        form [] [
+        form [ OnSubmit (fun ev -> dispatch <| UpdateMsg (tryLogin); ev.preventDefault() ) ] [
             label [] [
                 str "Login: "
                 textBox [] "text" logindata.Login dispatch (fun (m, b) v -> { m with Login = v }, b)
@@ -94,7 +94,7 @@ let renderDialog (logindata, validationResult) (dispatch: UpdateMsg<DialogModel>
             //     textBox [] "number" logindata.Otp dispatch (fun (m, b) v -> { m with Otp = v }, b)
             //     str "Permanent login"
             // ]
-            simpleButton "submit" "Login" (UpdateMsg tryLogin) dispatch
+            simpleButton "submit" "Login" (UpdateMsg'.nop ()) dispatch
         ]
         (match validationResult with
          | None -> str ""

@@ -30,7 +30,7 @@ let view roleOracle id (model: Model) dispatch =
 
 
 let viewEnqueueForm id (model: WorkerModel.WorkerQueueItemFormModel) dispatch =
-    let submit (_ev: FormEvent) =
+    let submit (ev: FormEvent) =
         dispatch (UpdateMsg (fun model ->
             let cmd = Cmd.ofPromise
                         ApiClient.enqueueTask model
@@ -38,7 +38,7 @@ let viewEnqueueForm id (model: WorkerModel.WorkerQueueItemFormModel) dispatch =
                         (fun error -> UpdateMsg(fun m -> Fable.Import.Browser.window.alert (error.ToString()); m, Cmd.none))
             model, cmd
         ))
-        ()
+        ev.preventDefault()
     form [ OnSubmit submit ] [
         FormGenerator.createForm model dispatch
         button [ClassName "button is-primary"] [ str "Ok" ]

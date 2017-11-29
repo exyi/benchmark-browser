@@ -2,6 +2,8 @@ module PublicModel.PerfReportModel
 
 open System
 open System
+open System
+open System
 
 [<RequireQualifiedAccessAttribute>]
 type TestResultValue =
@@ -14,6 +16,14 @@ type TestResultValue =
     | Fraction of (float * string option)
     | Anything of string
 
+[<CLIMutableAttribute>]
+type FieldExplanationEntity = {
+    Id: string
+    Legend: string
+    Categories: string []
+}
+
+/// Data for one test run sumbitted by a worker
 type WorkerSubmission = {
     ProjectId: Guid
     DateComputed: DateTime
@@ -25,6 +35,17 @@ type WorkerSubmission = {
     Environment: Map<string, string>
     Results: Map<string, TestResultValue>
 }
+
+// type BulkSubmissionType =
+//     | BenchmarkDotNetJson
+
+// type BulkWorkerSubmission = {
+//     ProjectId: Guid
+//     DateComputed: DateTime
+//     ProjectVersion: string
+//     BuildSystemVersion: string
+//     BulkSubmissionType
+// }
 
 [<RequireQualifiedAccessAttribute>]
 type ImportResult =

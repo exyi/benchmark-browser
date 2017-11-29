@@ -9,7 +9,7 @@ open Authentication
 let pushResults (context: HttpContext) data =
     let userGuid = Authentication.getCurrentUserId context
     DatabaseOperation.execOperation context (fun session ->
-        PerfReportService.pushResults userGuid data session
+        WorkerTaskService.pushResults userGuid data session
     )
 
 let listProjects (context: HttpContext) =

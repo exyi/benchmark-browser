@@ -52,5 +52,5 @@ type WorkerQueueItem = {
     Id: Guid
     Task: TaskSpecification
     Priority: float
-    LastUpdate: DateTime
+    mutable LastUpdate: DateTime
 }

@@ -16,23 +16,6 @@ open PublicModel.ProjectManagement
 open DataAccess.WorkerTaskService
 open Giraffe.XmlViewEngine
 
-let pushResults userId (importData: PerfReportModel.WorkerSubmission seq) (s: IDocumentSession) = task {
-    let usedProjectIds = importData |> Seq.map (fun i -> i.ProjectId) |> Set.ofSeq
-    let! existingIds = task {
-        let! projects = s.LoadManyAsync(usedProjectIds |> Seq.toArray)
-        return Map.ofSeq (Seq.map (fun p -> p.ProjectId, p) projects)
-    }
-
-    return
-        importData |> Seq.map (fun d ->
-            if Map.containsKey d.ProjectId existingIds |> not then ImportResult.ProjectDoesNotExists d.ProjectId
-            else
-                let entity = { BenchmarkReport.Id = Guid.NewGuid(); Data = d; DateSubmitted = DateTime.UtcNow; WorkerId = userId }
-                s.Store(entity)
-                ImportResult.Ok entity.Id
-        )
-}
-
 let listTests (s:IDocumentSession) = task {
     let! projects =
         (query{

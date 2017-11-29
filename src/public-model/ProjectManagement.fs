@@ -27,7 +27,7 @@ type BuildOptions = {
 type TestExecutionMethod =
     | ExecScript of exec: string
     | DotnetRun of BuildOptions * arguments: string
-    | CargoBench of BuildOptions
+    // | CargoBench of BuildOptions
 
 type TestDefinition = {
     BenchmarksRepository: string
@@ -44,7 +44,6 @@ type TestDefFormModel = {
     FriendlyId: string
     Definition: TestDefinition
 }
-
 
 [<CLIMutableAttribute>]
 type TestDefEntity = {

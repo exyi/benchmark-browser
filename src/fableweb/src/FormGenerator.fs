@@ -103,7 +103,7 @@ let rec createFormCore (modelType:System.Type) (model: obj) (dispatch: UpdateMsg
             let value : obj = !!ev.target?checked
             dispatch (UpdateMsg (fun _ -> procValue value, Cmd.none))
         input [
-            HTMLAttr.ClassName "form-control form-control-bool input"
+            HTMLAttr.ClassName "form-control form-control-bool"
             HTMLAttr.Type "checkbox"
             HTMLAttr.Value (model.ToString())
             HTMLAttr.Checked (unbox model)

@@ -18,6 +18,8 @@ open System.Threading.Tasks.Dataflow
 open PublicModel.ProjectManagement
 open UserService
 open PublicModel.WorkerModel
+open PublicModel.WorkerModel
+open PublicModel.PerfReportModel
 
 let optionOfNull o =
     if (obj.ReferenceEquals(o, null)) then None else Some o
@@ -34,14 +36,20 @@ let findItemsInQueue (limit:int) (s:IDocumentSession) = task {
 }
 
 let allocateItem (item:WorkerQueueItem) (s:IDocumentSession) = task {
-    s.Patch<WorkerQueueItem>(item.Id).Set("LastUpdate", DateTime.UtcNow)
+    let! e = s.LoadAsync<WorkerQueueItem>(item.Id)
+    e.LastUpdate <- DateTime.UtcNow
+    // s.Patch<WorkerQueueItem>(item.Id).Set("LastUpdate", DateTime.UtcNow)
+    s.Store e
 }
 
 let pushStateUpdate (info: WorkStatusInfo) (s:IDocumentSession) = task {
     let entity = {
             TaskStatusUpdateEntity.Id = Guid.NewGuid()
             Info = info }
-    s.Patch<WorkerQueueItem>(info.TaskId).Set("LastUpdate", DateTime.UtcNow)
+    // s.Patch<WorkerQueueItem>(info.TaskId).Set("LastUpdate", DateTime.UtcNow)
+    let! e = s.LoadAsync<WorkerQueueItem>(info.TaskId)
+    e.LastUpdate <- DateTime.UtcNow
+    s.Store e
     s.Store(entity)
 }
 
@@ -85,8 +93,25 @@ let enqueueWorkerTask (userId: Guid) (form: WorkerQueueItemFormModel) (s: IDocum
                         ProjectVersion = form.ProjectVersion.ToVersionString()
                     }
                 Priority = 1.0
-                LastUpdate = DateTime.UtcNow
+                LastUpdate = DateTime.MinValue
             }
         s.Store(queueItem)
         return Ok (queueItem.Id.ToString())
+}
+
+let pushResults userId (importData: PerfReportModel.WorkerSubmission seq) (s: IDocumentSession) = task {
+    let usedProjectIds = importData |> Seq.map (fun i -> i.ProjectId) |> Set.ofSeq
+    let! existingIds = task {
+        let! projects = s.LoadManyAsync(usedProjectIds |> Seq.toArray)
+        return Map.ofSeq (Seq.map (fun (p: TestDefEntity) -> p.Id, p) projects)
+    }
+
+    return
+        importData |> Seq.map (fun d ->
+            if Map.containsKey d.ProjectId existingIds |> not then ImportResult.ProjectDoesNotExists d.ProjectId
+            else
+                let entity = { BenchmarkReport.Id = Guid.NewGuid(); Data = d; DateSubmitted = DateTime.UtcNow; WorkerId = userId }
+                s.Store(entity)
+                ImportResult.Ok entity.Id
+        ) |> Seq.toArray
 }
