@@ -87,7 +87,7 @@ let enqueueWorkerTask (userId: Guid) (form: WorkerQueueItemFormModel) (s: IDocum
                 WorkerModel.WorkerQueueItem.Id = Guid.NewGuid()
                 Task =
                     {
-                        TaskSpecification.ProjectId = projectEntity.Id
+                        TaskSpecification.DefinitionId = projectEntity.Id
                         Definition = projectEntity.TestDefinition
                         BuildScriptVersion = form.BenchmarkerVersion.ToVersionString()
                         ProjectVersion = form.ProjectVersion.ToVersionString()
@@ -100,7 +100,7 @@ let enqueueWorkerTask (userId: Guid) (form: WorkerQueueItemFormModel) (s: IDocum
 }
 
 let pushResults userId (importData: PerfReportModel.WorkerSubmission seq) (s: IDocumentSession) = task {
-    let usedProjectIds = importData |> Seq.map (fun i -> i.ProjectId) |> Set.ofSeq
+    let usedProjectIds = importData |> Seq.map (fun i -> i.DefinitionId) |> Set.ofSeq
     let! existingIds = task {
         let! projects = s.LoadManyAsync(usedProjectIds |> Seq.toArray)
         return Map.ofSeq (Seq.map (fun (p: TestDefEntity) -> p.Id, p) projects)
@@ -108,7 +108,7 @@ let pushResults userId (importData: PerfReportModel.WorkerSubmission seq) (s: ID
 
     return
         importData |> Seq.map (fun d ->
-            if Map.containsKey d.ProjectId existingIds |> not then ImportResult.ProjectDoesNotExists d.ProjectId
+            if Map.containsKey d.DefinitionId existingIds |> not then ImportResult.ProjectDoesNotExists d.DefinitionId
             else
                 let entity = { BenchmarkReport.Id = Guid.NewGuid(); Data = d; DateSubmitted = DateTime.UtcNow; WorkerId = userId }
                 s.Store(entity)

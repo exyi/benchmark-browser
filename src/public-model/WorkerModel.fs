@@ -35,7 +35,7 @@ type WorkerQueueItemFormModel = {
 
 type TaskSpecification = {
     // Id: Guid
-    ProjectId: Guid
+    DefinitionId: Guid
     Definition: TestDefinition
     BuildScriptVersion: string
     ProjectVersion: string

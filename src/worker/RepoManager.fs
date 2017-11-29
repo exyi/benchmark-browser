@@ -27,21 +27,28 @@ let getUpToDate (config:WorkerConfig) (cloneUrl:Uri) =
 
     repoPath
 
-let checkoutLatestUpstreamVersion repoPath =
-    let ok, lines, errors = Git.CommandHelper.runGitCommand repoPath "remote show origin"
-    if not ok then failwithf "Could not run 'git show remote origin' : %s" errors
 
-    let mainBranchLine = lines |> Seq.map(fun l -> l.Trim()) |> Seq.find(fun l -> l.StartsWith("HEAD branch:"))
-    let mainBranch = mainBranchLine.Substring(mainBranchLine.IndexOf(':') + 1).Trim()
-
-    Git.CommandHelper.gitCommandf repoPath "checkout -f origin/%s" mainBranch
 
 let checkoutVersion repoPath version =
+    let likeReallyCorrectCheckout version =
+        Git.CommandHelper.gitCommandf repoPath "checkout -f %s" version
+        Git.CommandHelper.gitCommandf repoPath "submodule init"
+        Git.CommandHelper.gitCommandf repoPath "submodule update"
+
+    let checkoutLatestUpstreamVersion repoPath =
+        let ok, lines, errors = Git.CommandHelper.runGitCommand repoPath "remote show origin"
+        if not ok then failwithf "Could not run 'git show remote origin' : %s" errors
+
+        let mainBranchLine = lines |> Seq.map(fun l -> l.Trim()) |> Seq.find(fun l -> l.StartsWith("HEAD branch:"))
+        let mainBranch = mainBranchLine.Substring(mainBranchLine.IndexOf(':') + 1).Trim()
+
+        likeReallyCorrectCheckout ("origin/" + mainBranch)
+
     printfn "Repo %s checkout %s" repoPath version
     if version = "HEAD" then
         checkoutLatestUpstreamVersion repoPath
     else
-        Git.CommandHelper.gitCommandf repoPath "checkout -f %s" version
+        likeReallyCorrectCheckout version
 
 
 let getSpecificVersion config cloneUrl version =

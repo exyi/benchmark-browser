@@ -9,6 +9,7 @@ open System.Threading.Tasks
 // open Fable.Remoting.Giraffe
 open PublicModel
 open Newtonsoft.Json
+open DataAccess.FileStorage
 
 let json (dataObj : obj) : HttpHandler =
     setHttpHeader "Content-Type" "application/json"
@@ -69,6 +70,8 @@ let webApp : HttpHandler =
         routeCi "/projects" >=> serveGetFunction (TestReports.listProjects)
         routeCi "/dashboard" >=> serveFunction (TestReports.dashboard)
         routeCi "/enqueueTask" >=> requireAuth ["Admin"] >=> serveFunction (WorkerHub.enqueueWorkerTask)
+        routeCif "/pushFile/%s" (fun id -> requireAuth ["Worker"] >=> serveGetFunction (WorkerHub.pushFile StoredFileType.AnyAttachement id))
+        routeCif "/pushFile_stacks/%s" (fun id -> requireAuth ["Worker"] >=> serveGetFunction (WorkerHub.pushFile StoredFileType.CollectedStacks_Text id))
 
         subRouteCi "/admin"
             (requireAuth ["Admin"; "Valid"] >=> choose

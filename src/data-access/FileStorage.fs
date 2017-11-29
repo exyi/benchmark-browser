@@ -17,6 +17,7 @@ type StoredFileType =
 [<RequireQualifiedAccessAttribute>]
 type FileArchiveInfo =
     | Plain
+    | GZipped
 
 [<CLIMutableAttribute>]
 type StoredFileInfo = {
@@ -32,8 +33,7 @@ type StoredFileInfo = {
 
 let fileStoragePath = "./blobStorage"
 
-let storeFile t tags (stream: IO.Stream) (s: IDocumentSession) = task {
-    let id = Guid.NewGuid()
+let storeFile fileId t tags (stream: IO.Stream) (s: IDocumentSession) = task {
     IO.Directory.CreateDirectory(fileStoragePath) |> ignore
     let extension =
         match t with
@@ -42,22 +42,23 @@ let storeFile t tags (stream: IO.Stream) (s: IDocumentSession) = task {
         | StoredFileType.AnyAttachement ->
             if Array.contains "log" tags then ".log"
             else if Array.contains "html" tags then ".html"
-            else if Array.contains "BDN_json" tags then ".bdn.json"
+            else if Array.contains "BdnReport" tags && Array.contains "json" tags then ".bdn.json"
             else if Array.contains "json" tags then ".json"
             else if Array.contains "csv" tags then ".csv"
             else if Array.contains "xml" tags then ".xml"
+            else if Array.contains "markdown" tags then ".md"
             else ".attachement"
-    let fileName = IO.Path.Combine(fileStoragePath, (string id) + extension) |> IO.Path.GetFullPath
-    use file = IO.File.OpenWrite(fileName)
+    let fileName = IO.Path.Combine(fileStoragePath, (string fileId) + extension) |> IO.Path.GetFullPath
+    use file = new IO.Compression.GZipStream(IO.File.OpenWrite(fileName), IO.Compression.CompressionLevel.Optimal)
     do! stream.CopyToAsync(file)
     let entity = {
-        StoredFileInfo.Id = id
+        StoredFileInfo.Id = fileId
         FilePath = fileName
-        ArchiveInfo = FileArchiveInfo.Plain
+        ArchiveInfo = FileArchiveInfo.GZipped
         Type = t
         DateCreated = DateTime.Now
         Tags = tags
          }
-    s.Store entity
+    s.Insert entity
     return entity
 }

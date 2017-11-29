@@ -25,3 +25,11 @@ let pushWorkStatus (context:HttpContext) (status: WorkStatusInfo) =
 let enqueueWorkerTask context (form: WorkerQueueItemFormModel) =
     let uid = getCurrentUserId context
     DatabaseOperation.execOperation context (WorkerTaskService.enqueueWorkerTask uid form)
+
+let pushFile t (fileId: string) (context:HttpContext) =
+    let fileId = Guid.Parse fileId
+    let tags = context.Request.Query.["tag"] |> Seq.toArray
+
+    DatabaseOperation.execOperation context (fun session ->
+        FileStorage.storeFile fileId t tags (context.Request.Body) session
+    )

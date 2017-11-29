@@ -30,6 +30,7 @@ open PublicModel.PerfReportModel
 open Newtonsoft.Json.Linq
 open PublicModel.PerfReportModel
 open System.Collections.Generic
+open Fake.Core.String
 
 let getConfig (args: string array) =
     let file = args.[0]
@@ -50,7 +51,7 @@ let sendRequest config (url:string) auth content =
         request.Method <- HttpMethod.Get
     | Some content ->
         request.Method <- HttpMethod.Post
-        request.Content <- new StringContent(content, Encoding.UTF8)
+        request.Content <- content
 
     let result = client.SendAsync(request).Result
 
@@ -60,8 +61,14 @@ let sendRequest config (url:string) auth content =
         Error result
 
 let sendJsonRequest config auth url data =
-    let json = Newtonsoft.Json.JsonConvert.SerializeObject(data, Fable.JsonConverter())
-    let result = sendRequest config url auth (Some json)
+    let content =
+        if box data :? IO.Stream then
+            new StreamContent(box data :?> IO.Stream) :> HttpContent
+        else
+            let json = Newtonsoft.Json.JsonConvert.SerializeObject(data, Fable.JsonConverter())
+            new StringContent(json, Encoding.UTF8) :> HttpContent
+
+    let result = sendRequest config url auth (Some content)
     result |> Result.map (fun rjson ->
         Newtonsoft.Json.JsonConvert.DeserializeObject(rjson, Fable.JsonConverter())
     )
@@ -94,7 +101,6 @@ let grabSomeWork (server: IServerFunction) =
     let work : PublicModel.WorkerModel.WorkerQueueItem option = server.Invoke "getMeSomeWork" () |> expectOk
     work
 
-
 let prepareRun repoPath test =
     // let argList2 name values =
     //     values
@@ -124,7 +130,7 @@ let prepareRun repoPath test =
         let preprocessorVars = Seq.append (if false then (commitHashes.Value |> Seq.map (fun c -> "C_" + c)) else seq []) [ options.PreprocessorParameters ]
         let defineConstants = String.Join(";", preprocessorVars)
         assert (defineConstants.Contains " " |> not)
-        let args = sprintf "msbuild %s /p:Configuration=%s /p:AdditionalBenchmarkConstants=%s" project configuration defineConstants
+        let args = sprintf "msbuild %s /p:Configuration=%s \"/p:AdditionalBenchmarkConstants=\\\"%s\\\"\"" project configuration defineConstants
         let dotnetParam = { Fake.DotNet.Cli.DotnetOptions.Default with DotnetCliPath = "dotnet"; WorkingDirectory = repoPath }
         Trace.tracefn "Restoring packages at %s" project
         Fake.DotNet.Cli.DotnetRestore (fun opt -> { opt with Common = dotnetParam; }) project
@@ -152,8 +158,9 @@ type BenchmarkDotNetLogExtraction = {
 }
 
 type BenchmarkData = {
-    Attachements: string array
+    Attachements: (string * Guid) array
     ResultLegend: Map<string, string>
+    // LocalAttachements: Map<string, string>
     Data: WorkerSubmission []
 }
 
@@ -161,6 +168,7 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
     let globalJson = JObject.Parse(IO.File.ReadAllText(filePath))
 
 
+    let files = ResizeArray<(string * Guid)>()
     let parseTestResult (json:JObject) =
         let results = ResizeArray<(string * TestResultValue)>()
         let environment = ResizeArray<(string * string)>()
@@ -170,13 +178,14 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
         let unknownFields = json.Descendants() |> Linq.Enumerable.OfType<JObject> |> Seq.collect (fun x -> x.Properties()) |> Seq.filter (fun p -> not <| Set.contains p.Name knownFields)
         let getPath (j:JToken) =
             Seq.unfold (fun (j:JToken) ->
-                if j.Parent = (json :> JContainer) || isNull j.Parent then
+                if j = (json :> JToken) || isNull j.Parent then
                     None
                 else match j with
                      | :? JProperty as prop -> Some (Some prop.Name, j.Parent :> JToken)
                      | _ -> Some(None, j.Parent :> JToken))
                 j
                 |> Seq.choose id
+                |> Seq.rev
                 |> (fun d -> String.Join(".", d))
 
         // printfn "%A" unknownFields
@@ -208,6 +217,10 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
                 | "Dimensionless" ->
                     if legend.["IsNumeric"].Value<bool>() then
                         results.Add("Columns." + propName, TestResultValue.Number (v.Value<string>() |> Double.Parse, None))
+                    else if legend.["IsFileName"].Value<bool>() then
+                        let fileGuid = Guid.NewGuid()
+                        files.Add (v.Value<string>(), fileGuid)
+                        results.Add("Columns." + propName, TestResultValue.AttachedFile (fileGuid, ""))
                     else
                         results.Add("Columns." + propName, TestResultValue.Anything <| v.Value<string>())
                 | "TimeUnit" ->
@@ -225,13 +238,13 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
 
         { emptySubmission with TaskName = testid; Environment = Map.ofSeq environment; Results = Map.ofSeq results; TaskParameters = parameters }
 
-    let testData = globalJson.["Benchmarks"] :?> JArray |> Seq.map (fun x -> parseTestResult (x :?> JObject))
+    let testData = globalJson.["Benchmarks"] :?> JArray |> Seq.map (fun x -> parseTestResult (x :?> JObject)) |> Seq.toArray
 
     let legend = globalJson.["Columns"] :?> JObject :> seq<KeyValuePair<string, JToken>> |> Seq.map (fun (KeyValue (propName, j)) -> ("Columns." + propName, j.["Legend"].Value<string>()))
 
     {
-        BenchmarkData.Attachements = [| |]
-        Data = Seq.toArray testData
+        BenchmarkData.Attachements = files.ToArray()
+        Data = testData
         ResultLegend = Map.ofSeq legend
     }
 
@@ -239,7 +252,7 @@ let benchmarkDotNet_processStuff emptyReport (extract: BenchmarkDotNetLogExtract
     let jsonFile = extract.OutFiles |> Seq.tryFind (fun f -> f.EndsWith ".json")
     let result = jsonFile |> Option.map (benchmarkDotNet_parseJson emptyReport) |> Option.defaultValue { BenchmarkData.Data = [||]; Attachements = [||]; ResultLegend = Map.empty }
 
-    { result with Attachements = Array.concat [ result.Attachements; extract.OutFiles.ToArray() ] }
+    { result with Attachements = Array.concat [ result.Attachements; extract.OutFiles |> Seq.map (fun f -> f, Guid.NewGuid()) |> Seq.toArray ] }
 
 let benchmarkDotNet_logparser applicationWD =
     let extract = { BenchmarkDotNetLogExtraction.OutFiles = ResizeArray() }
@@ -249,7 +262,7 @@ let benchmarkDotNet_logparser applicationWD =
         if lineT = "// * Export *" then
             exportSection <- true
 
-        if exportSection then
+        else if exportSection then
             if String.IsNullOrEmpty lineT then
                 exportSection <- false
             else
@@ -262,11 +275,11 @@ let executeTest repoPath projectId (test: TestDefinition) =
     let logFileName = IO.Path.GetTempFileName() + ".log"
     use logFile = IO.File.CreateText logFileName;
     let emptySubmission = {
-        WorkerSubmission.ProjectId = projectId
+        WorkerSubmission.DefinitionId = projectId
         DateComputed = DateTime.UtcNow
         TaskName = ""
-        ProjectVersion = Fake.Tools.Git.Branches.getSHA1 "HEAD" (IO.Path.Combine(repoPath, test.ProjectRepoPath))
-        BuildSystemVersion = Fake.Tools.Git.Branches.getSHA1 "HEAD" repoPath
+        ProjectVersion = Fake.Tools.Git.Branches.getSHA1 (IO.Path.Combine(repoPath, test.ProjectRepoPath)) "HEAD"
+        BuildSystemVersion = Fake.Tools.Git.Branches.getSHA1 repoPath "HEAD"
         TaskParameters = Map.empty
         Results = Map.empty
         Environment = Map.empty }
@@ -299,12 +312,48 @@ let executeWork config (spec:TaskSpecification) =
     printfn "Executing %A" spec
     let repo = RepoManager.prepareRepository config spec
     printfn "%s" repo
-    let results, logFile = executeTest repo spec.ProjectId spec.Definition
+    let results, logFile = executeTest repo spec.DefinitionId spec.Definition
     printfn "Logfile is at %s" logFile
-    { results with Attachements = Array.append results.Attachements [| logFile |] }
+    { results with Attachements = Array.append results.Attachements [| logFile, Guid.NewGuid() |] }
 
-let sendResponse (api: IServerFunction) ({ BenchmarkData.Attachements = attachements; Data = results; ResultLegend = _legend}) : PerfReportModel.ImportResult seq =
-    api.Invoke "pushResults" results |> expectOk
+let sendResponse (api: IServerFunction) ({ BenchmarkData.Attachements = attachements; Data = results; ResultLegend = _legend}) : PerfReportModel.ImportResult array =
+    let results = api.Invoke "pushResults" results |> expectOk |> Seq.toArray
+
+    for (file, fileId) in attachements do
+        try
+            use stream = IO.File.OpenRead file
+            let specialType =
+                if file.EndsWith(".stacks") || file.EndsWith(".stacks.gz") then "_stacks"
+                else ""
+
+            printf "Uploading file%s %s: " specialType file
+
+            use stream = if (String.IsNullOrEmpty specialType |> not) && file.EndsWith(".gz") then
+                            new IO.Compression.GZipStream(stream, IO.Compression.CompressionMode.Decompress) :> IO.Stream
+                         else stream :> IO.Stream
+
+            let tags =
+                [|
+                    (if file.EndsWith(".json") then Some "json" else None)
+                    (if file.EndsWith(".json") then Some "json" else None)
+                    (if file.EndsWith(".xml") then Some "xml" else None)
+                    // (if file.EndsWith("-report.json") && file.Contains "BenchmarkDotNet.Artifacts" then Some "BDN_json" else None)
+                    (if IO.Path.GetFileNameWithoutExtension(file).Split('-') |> Array.contains("report") && file.Contains "BenchmarkDotNet.Artifacts" then Some "BdnReport" else None)
+                    (if file.EndsWith(".log") then Some "log" else None)
+                    (if file.EndsWith(".html") then Some "html" else None)
+                    (if file.EndsWith(".csv") then Some "csv" else None)
+                |] |> Array.choose id
+
+            let tagsQS = tags |> Seq.map Uri.EscapeDataString |> Seq.map ((+) "tag=") |> (fun x -> String.Join('&', x))
+
+            api.Invoke (sprintf "pushFile%s/%O?%s" specialType fileId tagsQS) stream |> expectOk
+
+            printfn "OK"
+
+        with error ->
+            printfn "Error while uploading: %O" error
+
+    results
 
 [<EntryPoint>]
 let main argv =

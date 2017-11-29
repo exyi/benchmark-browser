@@ -32,7 +32,7 @@ let urlUpdate (result: Option<Page>) model =
 
       // Do some special behavior, like loading a model
       match page with
-      | EnqueueTask id -> { model with board = { model.board with NewItemModel = { ProjectDashboard.initNewItemForm with TestDefId = id } } }, Cmd.none
+      | EnqueueTask id -> { model with board = { model.board with NewItemModel = ({ ProjectDashboard.initNewItemForm with TestDefId = id }, false) } }, Cmd.none
       | Dashboard id -> model, Cmd.map Msg.BoardMsg (Cmd.map ProjectDashboard.Model.LiftTestMsg (LoadableData'.loadData (expectResultPromise << ApiClient.loadDashboard) id))
       | _ -> model, []
 
