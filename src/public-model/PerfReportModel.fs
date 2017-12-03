@@ -36,6 +36,8 @@ type WorkerSubmission = {
     TaskParameters: Map<string, string>
     /// Git version of the measured repository
     ProjectVersion: string
+    /// Root commit of the measured repository used as a project identifier
+    ProjectRootCommit: string
     /// Git version of build-repository
     BuildSystemVersion: string
     /// Stuff like OS, Hardware, .NET Version and so on

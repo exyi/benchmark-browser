@@ -77,3 +77,10 @@ let prepareRepository config (spec: TaskSpecification) =
 let listAllCommits (abbreviate: bool) repoPath =
     let list = Git.CommandHelper.getGitResult repoPath (sprintf "log --pretty=format:\"%s\"" (if abbreviate then "%h" else "%H"))
     list.ToArray()
+
+let getCurrentCommit repoPath = Fake.Tools.Git.Branches.getSHA1 repoPath "HEAD"
+
+let getRootCommit repoPath =
+    let success, lines, _err = Git.CommandHelper.runGitCommand repoPath "git rev-list --max-parents=0 HEAD"
+    if not success then failwith ""
+    String.Join("-", lines |> Seq.map(fun x -> x.Trim()))

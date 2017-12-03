@@ -6,7 +6,8 @@ type Page =
   | Counter
   | About
   | Admin of AdminPage
-  | Dashboard of id: string
+  | ProjectDashboard of id: string
+  | TaskDashboard of id: string
   | EnqueueTask of projectId: string
 
 let toHash page =
@@ -17,6 +18,7 @@ let toHash page =
   | Admin page ->
       match page with
       | AdminPage.EditProject pid -> sprintf "#admin/editProject/%s" pid
-      | AdminPage.NewProject -> sprintf "#admin/newProject"
-  | Dashboard id -> sprintf "#board/%s" id
-  | EnqueueTask projectId -> sprintf "#board/%s/newTask" projectId
+      | AdminPage.NewTaskDef -> sprintf "#admin/newProject"
+  | ProjectDashboard id -> sprintf "#board/%s" id
+  | EnqueueTask taskId -> sprintf "#taskBoard/%s/newTask" taskId
+  | TaskDashboard taskId -> sprintf "#taskBoard/%s" taskId

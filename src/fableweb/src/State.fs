@@ -15,11 +15,12 @@ let pageParser: Parser<Page->Page,Page> =
     map About (s "about")
     map Counter (s "counter")
     map Home (s "home")
-    map (Admin AdminPage.NewProject) (s "admin" </> s "newProject")
+    map (Admin AdminPage.NewTaskDef) (s "admin" </> s "newProject")
     // map (Admin AdminPage.NewProject) (s "newProject")
     map (Admin << AdminPage.EditProject) (s "admin" </> s "editProject" </> str)
-    map Dashboard (s "board" </> str)
-    map EnqueueTask (s "board" </> str </> s "enqueue")
+    map ProjectDashboard (s "board" </> str)
+    map TaskDashboard (s "taskBoard" </> str)
+    map EnqueueTask (s "taskBoard" </> str </> s "enqueue")
   ]
 
 let urlUpdate (result: Option<Page>) model =
@@ -33,7 +34,8 @@ let urlUpdate (result: Option<Page>) model =
       // Do some special behavior, like loading a model
       match page with
       | EnqueueTask id -> { model with board = { model.board with NewItemModel = ({ ProjectDashboard.initNewItemForm with TestDefId = id }, false) } }, Cmd.none
-      | Dashboard id -> model, Cmd.map Msg.BoardMsg (Cmd.map ProjectDashboard.Model.LiftTestMsg (LoadableData'.loadData (expectResultPromise << ApiClient.loadDashboard) id))
+      | ProjectDashboard id -> {model with board = ProjectDashboard.initState}, Cmd.map Msg.BoardMsg (Cmd.map ProjectDashboard.Model.LiftTestMsg (LoadableData'.loadData (expectResultPromise << ApiClient.loadProjectDashboard) id))
+      | TaskDashboard id -> {model with board = ProjectDashboard.initState}, Cmd.map Msg.BoardMsg (Cmd.map ProjectDashboard.Model.LiftTestMsg (LoadableData'.loadData (expectResultPromise << ApiClient.loadTestDefDashboard) id))
       | _ -> model, []
 
 let init result =

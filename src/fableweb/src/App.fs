@@ -40,7 +40,7 @@ let menu currentPage userRoleOracle =
         ]
         |> List.append
              (if userRoleOracle "Admin" then [
-               menuItem "Create Project" (Admin AdminPage.NewProject) currentPage
+               menuItem "Create Task Definition" (Admin AdminPage.NewTaskDef) currentPage
              ] else [])
         ) ]
 
@@ -51,13 +51,14 @@ let root model dispatch =
     | Page.About -> Info.View.root
     | Counter -> Counter.View.root model.counter (CounterMsg >> dispatch)
     | Home -> Home.View.root model.home (HomeMsg >> dispatch)
-    | Admin AdminPage.NewProject -> Admin.EditProject.renderView model.admin.NewProject (liftNewProject >> AdminMsg >> dispatch)
+    | Admin AdminPage.NewTaskDef -> Admin.EditProject.renderView model.admin.NewTaskDef (liftNewProject >> AdminMsg >> dispatch)
     | Admin (AdminPage.EditProject pid) ->
           match model.admin.EditProject with
           | Some (m) when m.Id.IsSome && m.Id.Value.ToString() = pid ->
                Admin.EditProject.renderView m (UpdateMsg'.liftSome () >> liftEditProject >> AdminMsg >> dispatch)
           | _ -> str "Loading project..."
-    | Dashboard id -> ProjectDashboard.view model.loginBox.HasRole id model.board (BoardMsg >> dispatch)
+    | ProjectDashboard id -> ProjectDashboard.viewProject model.loginBox.HasRole id model.board (BoardMsg >> dispatch)
+    | TaskDashboard id -> ProjectDashboard.viewTask model.loginBox.HasRole id model.board (BoardMsg >> dispatch)
     | EnqueueTask id -> ProjectDashboard.viewEnqueueForm id model.board.NewItemModel (ProjectDashboard.Model.LiftNewItemMsg >> BoardMsg >> dispatch)
 
   div

@@ -1,6 +1,7 @@
 module Utils
 
 open Fable
+open System
 open Elmish
 open System.Reflection.Emit
 open Fable.Core
@@ -92,3 +93,9 @@ let expectResultPromise (a:Fable.Import.JS.Promise<Result<'a, 'b>>) =
     a |> Promise.bind (function
                        | Ok a -> Promise.create(fun resolve _reject -> resolve a)
                        | Error e -> Promise.create(fun _resolve reject -> reject (System.Exception(e.ToString()))))
+
+let displayStrings a =
+    if Array.length a > 1 then
+        span [ Props.HTMLAttr.Title (String.Join(" | ", a |> Seq.ofArray)) ] [ str (a.[0] + ", ...") ]
+    else
+        str a.[0]

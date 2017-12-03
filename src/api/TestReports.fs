@@ -12,11 +12,15 @@ let pushResults (context: HttpContext) data =
         WorkerTaskService.pushResults userGuid data session
     )
 
-let listProjects (context: HttpContext) =
+let getHomeModel (context: HttpContext) =
     DatabaseOperation.execOperation context (fun s ->
-        PerfReportService.listTests s
+        PerfReportService.getHomeModel s
     )
 
 let dashboard ctx pid =
     let uid = getCurrentUserId ctx
-    DatabaseOperation.execOperation ctx (PerfReportService.getDashboard uid pid)
+    DatabaseOperation.execOperation ctx (PerfReportService.getTestDefDashboard uid pid)
+
+let projectDashboard ctx pid =
+    let uid = getCurrentUserId ctx
+    DatabaseOperation.execOperation ctx (PerfReportService.getProjectDashboard uid pid)

@@ -8,9 +8,9 @@ open Fable.Helpers.React.Props
 open Elmish
 open System
 
-let renderView (model: EditProjectModel) (dispatch: UpdateMsg<EditProjectModel> -> unit) =
+let renderView (model: EditTaskDefModel) (dispatch: UpdateMsg<EditTaskDefModel> -> unit) =
     let submit (ev: FormEvent) =
-        let updateMsg msg : UpdateMsg<EditProjectModel> = UpdateMsg (fun m -> { m with UIMessage = msg }, Cmd.none)
+        let updateMsg msg : UpdateMsg<EditTaskDefModel> = UpdateMsg (fun m -> { m with UIMessage = msg }, Cmd.none)
         let clearFormMsg = UpdateMsg (fun m -> { m with Form = initEditProjectForm }, Cmd.none)
 
         let error, cmd =

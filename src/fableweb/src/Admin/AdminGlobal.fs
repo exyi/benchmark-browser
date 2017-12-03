@@ -7,18 +7,18 @@ open PublicModel.ProjectManagement
 
 [<RequireQualifiedAccessAttribute>]
 type AdminPage =
-    | NewProject
+    | NewTaskDef
     | EditProject of string
 
-type EditProjectModel = {
+type EditTaskDefModel = {
     Id: Option<Guid>
     Form: PublicModel.ProjectManagement.TestDefFormModel
     UIMessage: UIMessage
 }
 
 type AdminModel = {
-    NewProject: EditProjectModel
-    EditProject: Option<EditProjectModel>
+    NewTaskDef: EditTaskDefModel
+    EditProject: Option<EditTaskDefModel>
 }
 
 let initEditProjectForm =
@@ -38,13 +38,13 @@ let initEditProjectForm =
 let initState () =
     {
         AdminModel.EditProject = None
-        AdminModel.NewProject =
+        AdminModel.NewTaskDef =
         {
-            EditProjectModel.Id = None
+            EditTaskDefModel.Id = None
             UIMessage = UIMessage.NoMsg
             Form = initEditProjectForm
         }
     }
 
-let liftNewProject = UpdateMsg'.lift (fun x -> x.NewProject) (fun m x -> { m with NewProject = x })
+let liftNewProject = UpdateMsg'.lift (fun x -> x.NewTaskDef) (fun m x -> { m with NewTaskDef = x })
 let liftEditProject = UpdateMsg'.lift (fun x -> x.EditProject) (fun m x -> { m with EditProject = x })

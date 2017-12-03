@@ -54,7 +54,7 @@ type TestDefEntity = {
     TestDefinition: TestDefinition
 }
 
-type ProjectListItem = {
+type TaskDefListItem = {
     Id: Guid
     FriendlyId: string
     Name: string
@@ -64,7 +64,33 @@ type ProjectListItem = {
     TasksQueued: int
 }
 
+type ResultProjectListItem = {
+    RootCommit: string
+    CloneUrls: string []
+    ReportCount: int
+    TasksRun: int
+    VersionsTested: int
+    TestDefinitionCount: int
+}
+
+type TestRunListModel = {
+    // QueueItemId: Guid
+    Date: DateTime
+    TaskFriendlyName: string
+    TaskDefId: Guid
+    Reports: int
+    ProjectVersion: string
+}
 
 type DashboardModel = {
-    TestDef: TestDefEntity
+    TaskDefinitions: TaskDefListItem []
+    DetailedTestDef: TestDefEntity option
+    Projects: ResultProjectListItem []
+    FewRecentTestRuns: TestRunListModel []
+}
+
+type HomePageModel = {
+    TaskDefinitions: TaskDefListItem []
+    Projects: ResultProjectListItem []
+    FewRecentTestRuns: TestRunListModel []
 }

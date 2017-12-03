@@ -4,7 +4,7 @@ open Elmish
 open Types
 open Utils
 
-let refreshData = ApiClient.listProjects
+let refreshData = ApiClient.getHomeModel
 
 let init () : Model * Cmd<UpdateMsg<Model>> =
   let updateCmd = LoadableData'.loadData refreshData ()

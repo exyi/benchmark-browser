@@ -71,11 +71,14 @@ let login (data: LoginData) : (LoginResult) JS.Promise =
 let createTaskDefinition (form:PublicModel.ProjectManagement.TestDefFormModel) : (Result<PublicModel.ProjectManagement.TestDefEntity, string>) JS.Promise =
     execApiRequest "admin/createTest" form []
 
-let listProjects () : JS.Promise<PublicModel.ProjectManagement.ProjectListItem []> =
-    execApiRequest "projects" () []
+let getHomeModel () : JS.Promise<PublicModel.ProjectManagement.HomePageModel> =
+    execApiRequest "home" () []
 
-let loadDashboard (id: string) : JS.Promise<Result<PublicModel.ProjectManagement.DashboardModel, string>> =
-    execApiRequest "dashboard" id []
+let loadTestDefDashboard (id: string) : JS.Promise<Result<PublicModel.ProjectManagement.DashboardModel, string>> =
+    execApiRequest "testdef/dashboard" id []
+
+let loadProjectDashboard (id: string) : JS.Promise<Result<PublicModel.ProjectManagement.DashboardModel, string>> =
+    execApiRequest "project/dashboard" id []
 
 let enqueueTask (data: WorkerModel.WorkerQueueItemFormModel) : JS.Promise<Result<string, string>> =
     execApiRequest "enqueueTask" data []
