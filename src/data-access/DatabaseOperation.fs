@@ -4,6 +4,8 @@ open System
 open System.Threading.Tasks
 open Microsoft.Extensions.DependencyInjection
 open Giraffe.Tasks
+open PublicModel.ProjectManagement
+open PublicModel.PerfReportModel
 
 // type DbAction = IDocumentSession -> Task
 
@@ -28,6 +30,10 @@ let execOperationOnStore (store:IDocumentStore) (f: IDocumentSession -> Task<'a>
 let execOperation (httpCtx:Microsoft.AspNetCore.Http.HttpContext) (f: IDocumentSession -> Task<'a>) =
     execOperationOnStore (httpCtx.RequestServices.GetRequiredService<IDocumentStore>()) f
 
+let private initTables (store: IDocumentStore) =
+    use session = store.LightweightSession()
+    session.Query<TestDefEntity>() |> Seq.tryHead |> ignore
+    session.Query<BenchmarkReport>() |> Seq.tryHead |> ignore
 let connectMarten (connectionString:string) =
     let serializer = Marten.Services.JsonNetSerializer()
     serializer.EnumStorage <- EnumStorage.AsString
@@ -51,6 +57,10 @@ let connectMarten (connectionString:string) =
         );
     )
     (execOperationOnStore store UserService.seedUsersIfNeeded).Result
+
+    // init tables that are used in SQL queries
+    initTables store
+
     store
 
 let removeEntity (id: Guid) check (s: IDocumentSession) = task {

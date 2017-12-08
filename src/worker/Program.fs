@@ -282,6 +282,7 @@ let executeTest repoPath projectId (test: TestDefinition) =
         TaskName = ""
         ProjectVersion = RepoManager.getCurrentCommit (IO.Path.Combine(repoPath, test.ProjectRepoPath))
         ProjectRootCommit = RepoManager.getRootCommit (IO.Path.Combine(repoPath, test.ProjectRepoPath))
+        ProjectCloneUrl = RepoManager.getCloneUrl (IO.Path.Combine(repoPath, test.ProjectRepoPath))
         BuildSystemVersion = RepoManager.getCurrentCommit repoPath
         TaskParameters = Map.empty
         Results = Map.empty
@@ -311,9 +312,9 @@ let executeTest repoPath projectId (test: TestDefinition) =
     finalizeFunction (), logFileName
 
 
-let executeWork config (spec:TaskSpecification) =
+let executeWork (config:WorkerConfig) (spec:TaskSpecification) =
     printfn "Executing %A" spec
-    let repo = RepoManager.prepareRepository config spec
+    let repo = RepoManager.prepareRepository config.ClonedRepositories spec
     printfn "%s" repo
     let results, logFile = executeTest repo spec.DefinitionId spec.Definition
     printfn "Logfile is at %s" logFile

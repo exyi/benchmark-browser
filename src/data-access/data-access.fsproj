@@ -5,8 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="../worker/RepoManager.fs" />
     <Compile Include="Library.fs" />
     <Compile Include="./Entities.fs" />
+    <Compile Include="./VersionComparer.fs" />
     <Compile Include="./DbServices/UserService.fs" />
     <Compile Include="./DbServices/WorkerTaskService.fs" />
     <Compile Include="./DbServices/PerfReportService.fs" />
@@ -15,8 +17,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Fake.Tools.Git" Version="5.0.0-beta010" />
     <PackageReference Include="Giraffe" Version="0.1.0-beta-300" />
     <PackageReference Include="Marten" Version="2.3.2" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="2.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="2.0.0" />
     <PackageReference Include="Otp.NET" Version="1.1.0" />
     <PackageReference Include="Scrypt.NET" Version="1.3.0" />
     <PackageReference Include="Fable.JsonConverter" Version="1.0.2" />

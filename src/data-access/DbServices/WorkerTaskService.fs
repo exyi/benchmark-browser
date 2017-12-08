@@ -4,22 +4,10 @@ open System
 open PublicModel
 open PublicModel.WorkerModel
 open Giraffe.Tasks
-open Microsoft.FSharp.Linq.RuntimeHelpers
-open PublicModel.WorkerModel
-open PublicModel.ProjectManagement
-open ProjectManagement
-open System.Reflection.Metadata
-open Marten
-open PublicModel.ProjectManagement
-open Marten
-open Giraffe.XmlViewEngine
-open System
-open System.Threading.Tasks.Dataflow
 open PublicModel.ProjectManagement
 open UserService
-open PublicModel.WorkerModel
-open PublicModel.WorkerModel
 open PublicModel.PerfReportModel
+open Marten
 
 let optionOfNull o =
     if (obj.ReferenceEquals(o, null)) then None else Some o

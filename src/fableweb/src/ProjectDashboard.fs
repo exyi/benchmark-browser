@@ -2,11 +2,34 @@ module ProjectDashboard
 open Utils
 open PublicModel
 open PublicModel.ProjectManagement
+open Fable.Helpers
 open Fable.Helpers.React
 open PublicModel.AccountManagement
 open Fable.Helpers.React.Props
 open Fable.Import.React
 open Elmish
+open PublicModel.PerfReportModel
+open Fable.Core
+open Fable.Core.JsInterop
+open PublicModel.PerfReportModel
+
+// [<Fable.Core.>]
+// type TrendControl = class inherit Component<obj, obj> end
+
+[<RequireQualifiedAccessAttribute>]
+type TrendProp =
+    | Data of obj array
+    | Gradient of string array
+    | Smooth of bool
+    | Radius of int
+    | AutoDraw of bool
+    | AutoDrawDuration of float
+    | AutoDrawEasing of string
+
+    interface IProp
+
+let trendControl (props: IProp list) =
+    React.createElement (JsInterop.importDefault "react-trend", JsInterop.keyValueList Fable.Core.CaseRules.LowerFirst props, [])
 
 type Model = {
     Test: LoadableData<DashboardModel>
@@ -48,6 +71,66 @@ let displayProject (model: ResultProjectListItem) =
         div [ ] [ str <| sprintf "%d tasks | %d reports | %d definitions | %d versions" model.TasksRun model.ReportCount model.TestDefinitionCount model.VersionsTested ]
       ]
 
+let viewRelativePerf (model: CommitRelativePerformance) =
+    let displayNum (num: float) title =
+        if num > 1.0001 then
+            span [ Style [ Color "hsl(141, 71%, 48%)"]; Title title ] [ str (sprintf "%.2g%%" (num * 100.0 - 100.0)) ]
+        else if num < 0.9999 then
+            span [ Style [ Color "hsl(348, 100%, 61%)"]; Title title ] [ str (sprintf "%.2g%%" (num * 100.0 - 100.0)) ]
+        else
+            span [ Title title] [ str "~" ]
+
+    span [] [
+        displayNum model.MinTime "Min"
+        str " / "
+        displayNum model.AvgTime "Avg"
+        str " / "
+        displayNum model.MaxTime "Max"
+
+        str (sprintf " (%d tests)" model.Count)
+    ]
+
+let viewTestedHeads (model: (string * string * CommitRelativePerformance) array) =
+    table [ ClassName "table is-narrow is-stripped" ] [
+            thead [ ClassName "thead" ] [
+                tr [ ClassName "tr" ] [
+                    th [ClassName "td"] [ str "Branch" ]
+                    th [ClassName "td"] [ str "Commit" ]
+                    th [ClassName "td"] [ str "Min / Avg / Max" ]
+                ]
+            ]
+            tbody [ClassName "tbody"] [
+                for (name, commit, perf) in model do
+                    yield tr [ ClassName "tr" ] [
+                        td [ ClassName "td" ] [ str name ]
+                        td [ ClassName "td" ] [ str commit ]
+                        td [ ClassName "td" ] [ viewRelativePerf perf ]
+                    ]
+            ]
+        ]
+
+let viewPerfData (model: ProjectPerfSummary) =
+    let viewBranchTrend (name, data : _ array) =
+        div [ ClassName "box" ] [
+            span [ ClassName "title is-4" ] [ str name ]
+            span [] [ str (sprintf " - %d tests" data.Length) ]
+            trendControl [
+                TrendProp.Data (data |> Array.map (fun (_name, p) -> box p.AvgTime))
+                TrendProp.AutoDraw true
+                TrendProp.AutoDrawDuration 500.0
+                TrendProp.AutoDrawEasing "ease-in"
+                TrendProp.Smooth true
+                TrendProp.Radius 20
+                TrendProp.Gradient [| "#00c6ff"; "#F0F"; "#FF0" |]
+            ]
+        ]
+
+    div [] [
+        for i in model.DetailedBranches do
+            yield viewBranchTrend i
+
+        yield viewTestedHeads model.HeadOnlyBranches
+    ]
 
 let viewTestReport (model: TestRunListModel) =
     tr [ ClassName "tr" ] [
@@ -69,6 +152,9 @@ let viewCore roleOracle (model: DashboardModel) dispatch =
             | Some _ -> model.Projects |> Seq.map displayProject |> Seq.toList
             | None -> model.TaskDefinitions |> Seq.map displayTaskDef |> Seq.toList
         )
+
+        viewPerfData model.PerfSummary
+
 
         table [ ClassName "table is-narrow is-stripped" ] [
             thead [ ClassName "thead" ] [

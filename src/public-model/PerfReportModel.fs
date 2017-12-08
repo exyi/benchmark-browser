@@ -17,6 +17,15 @@ type TestResultValue =
     | Anything of string
     | AttachedFile of Guid * string
 
+with
+    static member GetComparable =
+        function
+        | Time s -> Some s.TotalMilliseconds
+        | ByteSize s -> Some (float s)
+        | Number (a, _) -> Some a
+        | Fraction (a, _) -> Some a
+        | _ -> None
+
 [<CLIMutableAttribute>]
 type FieldExplanationEntity = {
     Id: string
@@ -36,6 +45,8 @@ type WorkerSubmission = {
     TaskParameters: Map<string, string>
     /// Git version of the measured repository
     ProjectVersion: string
+    /// Git clone url of measuered repository
+    ProjectCloneUrl: string
     /// Root commit of the measured repository used as a project identifier
     ProjectRootCommit: string
     /// Git version of build-repository
@@ -69,4 +80,31 @@ type BenchmarkReport = {
     DateSubmitted: DateTime
     WorkerId: Guid
     Data: WorkerSubmission
+}
+
+type CommitRelativePerformance = {
+    AvgTime: float
+    MaxTime: float
+    MinTime: float
+    Count: int
+}
+
+type ProjectPerfSummary = {
+    // List of name * (graph data = commit * numbers)
+    DetailedBranches: (string * (string * CommitRelativePerformance) []) []
+    // List of name * commit * numbers
+    HeadOnlyBranches: (string * string * CommitRelativePerformance) []
+}
+
+type PerfSummaryGroup = {
+    ColumnSummary: Map<string, CommitRelativePerformance>
+    // IngoredCount: int
+}
+
+type VersionComparisonSummary = {
+    CommitA: string * int
+    CommitB: string * int
+    SummaryGroups: Map<string, PerfSummaryGroup>
+    NewTests: string []
+    RemovedTests: string []
 }

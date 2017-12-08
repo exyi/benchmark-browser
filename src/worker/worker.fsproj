@@ -21,6 +21,8 @@
     <PackageReference Include="Fake.DotNet.Cli" Version="5.0.0-beta010" />
     <PackageReference Include="Fake.DotNet.NuGet" Version="5.0.0-beta010" />
     <PackageReference Include="Fake.Tools.Git" Version="5.0.0-beta010" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="2.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="2.0.0" />
     <!-- <PackageReference Include="Http.fs" Version="4.1.2" /> -->
     <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
     <!-- <PackageReference Include="FAKE" Version="5.0.0-beta010" /> -->

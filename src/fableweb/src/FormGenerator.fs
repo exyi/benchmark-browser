@@ -100,7 +100,7 @@ let rec createFormCore (modelType:System.Type) (model: obj) (dispatch: UpdateMsg
 
     else if modelType = typeof<bool> then
         let onchange (procValue) (ev:FormEvent) =
-            let value : obj = !!ev.target?checked
+            let value : obj = !!ev.target?``checked``
             dispatch (UpdateMsg (fun _ -> procValue value, Cmd.none))
         input [
             HTMLAttr.ClassName "form-control form-control-bool"

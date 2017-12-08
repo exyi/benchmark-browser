@@ -30,12 +30,14 @@ type TestExecutionMethod =
     // | CargoBench of BuildOptions
 
 type TestDefinition = {
+    /// Clone url of benchmarks repository
     BenchmarksRepository: string
     /// Command relative to BenchmarksRepository that will launch the run
     BuildScriptCommand: TestExecutionMethod
     ProjectRepository: ProjectRepositoryCloneUrl
     /// Path relative to BenchmarksRepository, where the project should be located
     ProjectRepoPath: string
+    /// How the results should be processed
     ResultsProcessor: ResultsProcessor
 }
 
@@ -80,6 +82,7 @@ type TestRunListModel = {
     TaskDefId: Guid
     Reports: int
     ProjectVersion: string
+    ProjectVersionBranch: string
 }
 
 type DashboardModel = {
@@ -87,6 +90,7 @@ type DashboardModel = {
     DetailedTestDef: TestDefEntity option
     Projects: ResultProjectListItem []
     FewRecentTestRuns: TestRunListModel []
+    PerfSummary: PerfReportModel.ProjectPerfSummary
 }
 
 type HomePageModel = {
