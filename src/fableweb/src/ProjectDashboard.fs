@@ -90,7 +90,7 @@ let viewRelativePerf (model: CommitRelativePerformance) =
         str (sprintf " (%d tests)" model.Count)
     ]
 
-let viewTestedHeads (model: (string * string * CommitRelativePerformance) array) =
+let viewTestedHeads masterCommit (model: (string * string * CommitRelativePerformance) array) =
     table [ ClassName "table is-narrow is-stripped" ] [
             thead [ ClassName "thead" ] [
                 tr [ ClassName "tr" ] [
@@ -103,7 +103,7 @@ let viewTestedHeads (model: (string * string * CommitRelativePerformance) array)
                 for (name, commit, perf) in model do
                     yield tr [ ClassName "tr" ] [
                         td [ ClassName "td" ] [ str name ]
-                        td [ ClassName "td" ] [ str commit ]
+                        td [ ClassName "td" ] [ a [ Href (sprintf "#compare/commits/%s/%s" masterCommit commit); Title "Compare with master" ] [ str commit ] ]
                         td [ ClassName "td" ] [ viewRelativePerf perf ]
                     ]
             ]
@@ -129,7 +129,7 @@ let viewPerfData (model: ProjectPerfSummary) =
         for i in model.DetailedBranches do
             yield viewBranchTrend i
 
-        yield viewTestedHeads model.HeadOnlyBranches
+        yield viewTestedHeads (model.DetailedBranches |> Seq.head |> snd |> Seq.head |> fst) model.HeadOnlyBranches
     ]
 
 
@@ -138,7 +138,7 @@ let viewTestReport (model: TestRunListModel) =
         td [ClassName "td"] [ (model.Date |> string |> System.DateTime.Parse).ToShortDateString() |> str ]
         td [ClassName "td"] [ a [ Href (sprintf "#taskBoard/%s" (string model.TaskDefId)) ] [ model.TaskFriendlyName |> str ] ]
         td [ClassName "td"] [ model.Reports |> string |> str ]
-        td [ClassName "td"] [ model.ProjectVersion |> str ]
+        td [ClassName "td"] [ a [ Href ("#detail/commit/" + model.ProjectVersion); Title "View detail of commit" ] [ str model.ProjectVersion ] ]
     ]
 
 let viewCore roleOracle (model: DashboardModel) dispatch =
