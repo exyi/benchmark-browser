@@ -243,7 +243,7 @@ let viewResultsGrid (tuples: (WorkerSubmission * WorkerSubmission) array) (setti
                 createObj [
                     "items" ==> settings.Columns
                     "onSortEnd" ==> (fun data _mouseEvent -> swapColumns (!!data?oldIndex) (!!data?newIndex))
-                    "lockAxis" ==> true
+                    "lockAxis" ==> "x"
                     "axis" ==> "x"
                 ], [||])
         ]
@@ -254,6 +254,8 @@ let viewSettingsPanel (model: GridLayoutSettings) dispatch =
     let addColumn col _ =
         dispatch (UpdateMsg (fun m ->
             let cols = m.InactiveColumns |> Array.except [ col ]
+            if cols.Length = 0 then
+                closeDropdown ()
             { m with InactiveColumns = cols; Columns = Array.append [| col |] m.Columns }, Cmd.none))
 
     let removeColumns filter _ =
@@ -272,20 +274,22 @@ let viewSettingsPanel (model: GridLayoutSettings) dispatch =
     div [] [
         Utils.dropDownMenu (
             button
-                [ ClassName ("button " + (if model.InactiveColumns.Length > 0 then "" else "is-disabled")) ]
-                [ str "Add colum"; Utils.littleDropDownIcon ]) (lazy (
-                    model.InactiveColumns |> Seq.map (fun col ->
-                        button [ ClassName "button"; Title col.Legend; OnClick (addColumn col) ] [ str col.Title ])
-                        |> Seq.toList
-                ))
+                [ ClassName "button"; Disabled (model.InactiveColumns.Length = 0) ]
+                [ str "Add column"; Utils.littleDropDownIcon ])
+                    (lazy (
+                            model.InactiveColumns |> Seq.map (fun col ->
+                                button [ ClassName "button is-small"; Title col.Legend; OnClick (addColumn col) ] [ str col.Title ])
+                                |> Seq.toList
+                    ))
         Utils.dropDownMenu (
             button
-                [ ClassName ("button " + (if model.InactiveColumns.Length > 0 then "" else "is-disabled")) ]
-                [ str "Remove columns"; Utils.littleDropDownIcon ]) (lazy (
-                    colGroups.Value |> Seq.map (fun (name, filter) ->
-                        button [ ClassName "button"; OnClick (removeColumns filter) ] [ str name ])
-                        |> Seq.toList
-                ))
+                [ ClassName "button "; Disabled (model.Columns.Length = 0) ]
+                [ str "Remove columns"; Utils.littleDropDownIcon ])
+                    (lazy (
+                            colGroups.Value |> Seq.map (fun (name, filter) ->
+                                button [ ClassName "button is-small"; OnClick (removeColumns filter) ] [ str name ])
+                                |> Seq.toList
+                    ))
     ]
 
 let viewData (model: ComparisonData) gridSettings gridSettingsDispatch =

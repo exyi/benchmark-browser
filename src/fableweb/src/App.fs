@@ -85,6 +85,13 @@ let root model dispatch =
                     [ pageHtml model.currentPage ] ] ] ] ]
                     // [ FormGenerator.createForm model.loginBox (dispatch << LoginMsg) ] ] ] ] ]
 
+let w = Browser.window
+w.addEventListener_unload (fun event ->
+  for (KeyValue (key, value)) in State.dirtyLocalStorage do
+    Browser.localStorage.setItem(key, Fable.Core.JsInterop.toJson value)
+  obj()
+)
+
 open Elmish.React
 open Elmish.Debug
 open Elmish.HMR

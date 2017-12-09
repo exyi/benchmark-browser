@@ -62,6 +62,10 @@ let init result =
                      Cmd.map HomeMsg homeCmd
                      Cmd.map LoginMsg loginCmd  ]
 
+
+/// These are set to local storage on page unload - just a optimization to avoid serialization after every model update
+let dirtyLocalStorage = System.Collections.Generic.Dictionary<string, obj>()
+
 let update msg model =
   match msg with
   | CounterMsg msg ->
@@ -81,4 +85,7 @@ let update msg model =
       { model with board = m }, Cmd.map BoardMsg cmd
   | CompareMsg msg ->
       let (m, cmd) = msg.Invoke model.compare
+      if m.GridSettings <> model.compare.GridSettings then
+          dirtyLocalStorage.["detail-grid-layout"] <- m.GridSettings
+            // Fable.Import.Browser.localStorage.setItem("detail-grid-layout", Fable.Core.JsInterop.toJson m.GridSettings)
       { model with compare = m }, Cmd.map CompareMsg cmd
