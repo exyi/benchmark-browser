@@ -15,6 +15,11 @@ open Elmish
 open Fable.Import.React
 open Fable.Core.JsInterop
 
+let splitLastSegment (str: string) =
+            let lastDot = str.LastIndexOf('.')
+            if lastDot > 0 then str.Remove(lastDot), str.Substring(lastDot + 1)
+            else "", str
+
 [<RequireQualifiedAccess>]
 type GridColumnValueGetter =
     | ResultValue of id: string
@@ -27,11 +32,6 @@ type GridColumnValueGetter =
 
 with
     member x.Eval (s: WorkerSubmission) =
-        let splitLastSegment (str: string) =
-            let lastDot = str.LastIndexOf('.')
-            if lastDot > 0 then str.Remove(lastDot), str.Substring(lastDot + 1)
-            else "", str
-
         let someString a = Some (TestResultValue.Anything a)
 
         match x with
@@ -117,7 +117,7 @@ with
             let settings = m.GridSettings.AddColumnsFromData (rows)
             { m with Data = x; GridSettings = settings })
     static member LiftSettingsMsg = UpdateMsg'.lift (fun x -> x.GridSettings) (fun m x -> { m with GridSettings = x })
-module SortableImport = 
+module SortableImport =
     let SortableContainer : System.Func<obj -> ReactElement, ComponentClass<obj>> = Fable.Core.JsInterop.import "SortableContainer" "react-sortable-hoc"
     let SortableElement : System.Func<obj -> ReactElement, ComponentClass<obj>> = Fable.Core.JsInterop.import "SortableElement" "react-sortable-hoc"
     let arrayMove : ('a [] -> int -> int -> 'a[])  = Fable.Core.JsInterop.import "arrayMove" "react-sortable-hoc"
@@ -250,11 +250,50 @@ let viewResultsGrid (tuples: (WorkerSubmission * WorkerSubmission) array) (setti
         tbody [ ClassName "tbody" ] (Seq.toList rows)
     ]
 
+let viewSettingsPanel (model: GridLayoutSettings) dispatch =
+    let addColumn col _ =
+        dispatch (UpdateMsg (fun m ->
+            let cols = m.InactiveColumns |> Array.except [ col ]
+            { m with InactiveColumns = cols; Columns = Array.append [| col |] m.Columns }, Cmd.none))
+
+    let removeColumns filter _ =
+        closeDropdown ()
+        dispatch (UpdateMsg (fun m ->
+            let filtered = m.Columns |> Array.filter filter
+            let cols = m.Columns |> Array.except filtered
+            { m with Columns = cols; InactiveColumns = Array.append filtered m.InactiveColumns }, Cmd.none))
+
+    let colGroups = lazy [
+        yield "All", fun _ -> true
+        for c in model.Columns |> Seq.map (fun col -> col.Title |> splitLastSegment |> fst) |> Seq.distinct |> Seq.filter (fun x -> x <> "") do
+            yield c + "... columns", fun col -> col.Title.StartsWith(c+".")
+    ]
+
+    div [] [
+        Utils.dropDownMenu (
+            button
+                [ ClassName ("button " + (if model.InactiveColumns.Length > 0 then "" else "is-disabled")) ]
+                [ str "Add colum"; Utils.littleDropDownIcon ]) (lazy (
+                    model.InactiveColumns |> Seq.map (fun col ->
+                        button [ ClassName "button"; Title col.Legend; OnClick (addColumn col) ] [ str col.Title ])
+                        |> Seq.toList
+                ))
+        Utils.dropDownMenu (
+            button
+                [ ClassName ("button " + (if model.InactiveColumns.Length > 0 then "" else "is-disabled")) ]
+                [ str "Remove columns"; Utils.littleDropDownIcon ]) (lazy (
+                    colGroups.Value |> Seq.map (fun (name, filter) ->
+                        button [ ClassName "button"; OnClick (removeColumns filter) ] [ str name ])
+                        |> Seq.toList
+                ))
+    ]
+
 let viewData (model: ComparisonData) gridSettings gridSettingsDispatch =
     let aMap = model.Base |> Seq.map (fun x -> createMappingKey x, x) |> Map.ofSeq
     let pairs = model.Target |> Seq.choose (fun x -> Map.tryFind (createMappingKey x) aMap |> Option.map (fun a -> a, x)) |> Seq.toArray
     div [] [
         viewComparisonSummary model.Comparison
+        viewSettingsPanel gridSettings gridSettingsDispatch
         div [ Style [ MaxWidth "90vw"; OverflowX "scroll" ] ] [
             viewResultsGrid pairs gridSettings gridSettingsDispatch
         ]
