@@ -8,6 +8,7 @@
     <Compile Include="./ApiClient.fs" />
     <!-- Global to the app -->
     <Compile Include="./ProjectDashboard.fs"/>
+    <Compile Include="./CompareDetail.fs" />
     <Compile Include="./Admin/AdminGlobal.fs"/>
     <Compile Include="Global.fs" />
 

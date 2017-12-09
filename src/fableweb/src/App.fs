@@ -60,6 +60,7 @@ let root model dispatch =
     | ProjectDashboard id -> ProjectDashboard.viewProject model.loginBox.HasRole id model.board (BoardMsg >> dispatch)
     | TaskDashboard id -> ProjectDashboard.viewTask model.loginBox.HasRole id model.board (BoardMsg >> dispatch)
     | EnqueueTask id -> ProjectDashboard.viewEnqueueForm id model.board.NewItemModel (ProjectDashboard.Model.LiftNewItemMsg >> BoardMsg >> dispatch)
+    | CompareDetail (v1, v2) -> CompareDetail.view (v1, v2) model.compare (CompareMsg >> dispatch)
 
   div
     []

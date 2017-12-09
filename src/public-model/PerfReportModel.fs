@@ -9,7 +9,7 @@ open System
 type TestResultValue =
     | Time of TimeSpan
     /// (Memory) size as a number of bytes
-    | ByteSize of int64
+    | ByteSize of float
     /// Any number with optional units
     | Number of (float * string option)
     /// Fraction of something, with optional specifier of the target. The 54% of execution time should be represented as (0.54, Some "AvgTime")
@@ -108,3 +108,29 @@ type VersionComparisonSummary = {
     NewTests: string []
     RemovedTests: string []
 }
+with
+    static member IdentityCompare commit count = { CommitA = commit, count; CommitB = commit, count; SummaryGroups = Map.ofSeq [ ]; NewTests = [||]; RemovedTests = [||] }
+
+[<RequireQualifiedAccessAttribute>]
+type ReportGroupSelector =
+    | Version of string
+
+
+[<RequireQualifiedAccessAttribute>]
+type IncludeOrExcludeOption =
+    | IncludeExcept of string []
+    | ExcludeExcept of string []
+with
+    static member IncludeAll = IncludeExcept [||]
+    static member ExcludeAll = ExcludeExcept [||]
+    member x.FilterMap map =
+        match x with
+        // | IncludeOrExcludeOption.ExcludeAll -> Map.empty
+        // | IncludeOrExcludeOption.IncludeAll -> map
+        | IncludeExcept a -> Map.filter (fun k _ -> not <| Array.contains k a) map
+        | ExcludeExcept a -> Map.filter (fun k _ -> Array.contains k a) map
+type ComparisonOptions = {
+    Environment: IncludeOrExcludeOption
+}
+with
+    static member Default = { ComparisonOptions.Environment = IncludeOrExcludeOption.IncludeExcept [||] }

@@ -176,14 +176,20 @@ let getHomeModel (s:IDocumentSession) = task {
 
 let private getVersionData =
     let cache : Collections.Concurrent.ConcurrentDictionary<(string * int), Task<IReadOnlyList<BenchmarkReport>>> = Collections.Concurrent.ConcurrentDictionary()
-    fun (commit: string) (reportCount: int) (session:IDocumentSession) ->
-        cache.GetOrAdd((commit, reportCount), fun _ -> task {
+    fun (commit: string) (reportCount: int option) (session:IDocumentSession) ->
+        let load _ = task {
             let! q = (query {
                         for d in session.Query<BenchmarkReport>() do
                         where (d.Data.ProjectVersion = commit)
                      }).ToListAsync()
             return q
-        })
+        }
+        match reportCount with
+        | Some reportCount -> cache.GetOrAdd((commit, reportCount), load)
+        | None ->
+            let task = load ()
+            task.ContinueWith(fun (t: Task<IReadOnlyList<_>>) -> cache.TryAdd((commit, t.Result.Count), t)) |> ignore
+            task
 
 let private getVersionComparison a b (s:IDocumentSession) = task {
     use s = s.DocumentStore.LightweightSession()
@@ -203,7 +209,7 @@ let private createPerfSummary testedVersions (repoStructure: CompleteRepoStructu
     match head with
     | None -> { PerfReportModel.ProjectPerfSummary.DetailedBranches = [||]; HeadOnlyBranches = [||] } |> Task.FromResult
     | Some(head, headC) ->
-        let compare (a_versionInfo: TestedProjectVersionInfo) (b_versionInfo) = getVersionComparison (a_versionInfo.ProjectVersion, a_versionInfo.Count) (b_versionInfo.ProjectVersion, b_versionInfo.Count) dbSession
+        let compare (a_versionInfo: TestedProjectVersionInfo) (b_versionInfo) = getVersionComparison (a_versionInfo.ProjectVersion, Some a_versionInfo.Count) (b_versionInfo.ProjectVersion, Some b_versionInfo.Count) dbSession
         let masterComparisons = masterTests |> Seq.map (fun (t, _) -> compare head t) |> Seq.toArray
         let headsComparisons = testedHeads |> Seq.map (fun (branchName, t) -> compare head (Seq.head t) |> liftTask (fun a -> branchName, a)) |> Seq.toArray
 
@@ -258,4 +264,18 @@ let getTestDefDashboard (uid: Guid) (pid:string) (s: IDocumentSession) = task {
                 PerfSummary = { PerfReportModel.ProjectPerfSummary.DetailedBranches = [||]; HeadOnlyBranches = [||] }
             }
     | None -> return Error ("")
+}
+
+let getReportGroups a session = task {
+    match a with
+    | ReportGroupSelector.Version commit ->
+        let! data = getVersionData commit None session
+        return data |> Seq.map (fun v -> v.Data) |> Seq.toArray
+}
+
+let compareGroups a b session = task {
+    let! vA = getReportGroups a session
+    let! vB = getReportGroups b session
+    let cmp = VersionComparer.compareVersions VersionComparer.ComparisonOptions.Default (vA) (vB)
+    return cmp, vA, vB
 }

@@ -63,7 +63,7 @@ module LoadableData' =
         (Cmd.ofPromise
             refreshFunction arg
             (UpdateMsg'.replace << LoadableData.Loaded)
-            (fun e -> UpdateMsg'.replace <| LoadableData.Error (sprintf "Loading erro %s" (e.ToString()))))
+            (fun e -> System.Diagnostics.Debugger.Break(); UpdateMsg'.replace <| LoadableData.Error (sprintf "Loading error %s" (e.ToString()))))
 
     let display model dispatch viewData refreshFunction =
         let refreshDispatch () =

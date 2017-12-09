@@ -204,7 +204,7 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
                     results.Add (path, TestResultValue.Number <| (f.Value.Value<float>(), None))
             ()
 
-        results.Add("Memory.BytesAllocatedPerOperation", json.["Memory"].["BytesAllocatedPerOperation"].Value<int64>() |> TestResultValue.ByteSize)
+        results.Add("Memory.BytesAllocatedPerOperation", json.["Memory"].["BytesAllocatedPerOperation"].Value<float>() |> TestResultValue.ByteSize)
         results.Add("Memory.Gen0Per1k", TestResultValue.Number(json.["Memory"].["Gen0Collections"].Value<float>(), None))
         results.Add("Memory.Gen1Per1k", TestResultValue.Number(json.["Memory"].["Gen1Collections"].Value<float>(), None))
         results.Add("Memory.Gen2Per1k", TestResultValue.Number(json.["Memory"].["Gen2Collections"].Value<float>(), None))
@@ -229,7 +229,7 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
                     let micros = v.Value<string>() |> Double.Parse
                     results.Add("Columns." + propName, TestResultValue.Time <| TimeSpan.FromMilliseconds(micros / 1000.0))
                 | "SizeUnit" ->
-                    let bytes = v.Value<string>() |> Int64.Parse
+                    let bytes = v.Value<string>() |> Double.Parse
                     results.Add("Columns." + propName, TestResultValue.ByteSize bytes)
                 | _ -> failwith ""
 

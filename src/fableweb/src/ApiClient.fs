@@ -10,6 +10,11 @@ open Fable.Core
 open System
 open Fable.Helpers.React
 open PublicModel
+open PublicModel.PerfReportModel
+open PublicModel.PerfReportModel
+open PublicModel.PerfReportModel
+open PublicModel.PerfReportModel
+open PublicModel.PerfReportModel
 
 let endpoint = "http://localhost:5000"
 
@@ -82,3 +87,11 @@ let loadProjectDashboard (id: string) : JS.Promise<Result<PublicModel.ProjectMan
 
 let enqueueTask (data: WorkerModel.WorkerQueueItemFormModel) : JS.Promise<Result<string, string>> =
     execApiRequest "enqueueTask" data []
+
+
+let loadComparison (verA: ReportGroupSelector) verB : JS.Promise<VersionComparisonSummary * WorkerSubmission[] * WorkerSubmission[]> =
+    if verA = verB then
+        let data = execApiRequest "getReports" verA []
+        data |> Promise.map (fun d -> VersionComparisonSummary.IdentityCompare "" (Array.length d), d, d)
+    else
+        execApiRequest "compareReports" (verA, verB) []

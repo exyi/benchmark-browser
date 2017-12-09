@@ -2,25 +2,6 @@ module VersionComparer
 open PublicModel.PerfReportModel
 open System
 
-[<RequireQualifiedAccessAttribute>]
-type IncludeOrExcludeOption =
-    | IncludeExcept of string []
-    | ExcludeExcept of string []
-with
-    static member IncludeAll = IncludeExcept [||]
-    static member ExcludeAll = ExcludeExcept [||]
-    member x.FilterMap map =
-        match x with
-        // | IncludeOrExcludeOption.ExcludeAll -> Map.empty
-        // | IncludeOrExcludeOption.IncludeAll -> map
-        | IncludeExcept a -> Map.filter (fun k _ -> not <| Array.contains k a) map
-        | ExcludeExcept a -> Map.filter (fun k _ -> Array.contains k a) map
-type ComparisonOptions = {
-    Environment: IncludeOrExcludeOption
-}
-with
-    static member Default = { ComparisonOptions.Environment = IncludeOrExcludeOption.IncludeExcept [||] }
-
 let private getGroups allPairs =
     let byTestName = allPairs |> Array.groupBy (fun (a, b) -> assert (a.TaskName = b.TaskName); a.TaskName)
     let byTestClass = allPairs |> Array.groupBy (fun (a, _) -> let indexOf = a.TaskName.LastIndexOf '.' in a.TaskName.Remove(indexOf))

@@ -10,6 +10,7 @@ type Msg =
   | LoginMsg of UpdateMsg<LoginBox.Model>
   | AdminMsg of UpdateMsg<AdminModel>
   | BoardMsg of UpdateMsg<ProjectDashboard.Model>
+  | CompareMsg of UpdateMsg<CompareDetail.Model>
 
 type Model = {
     currentPage: Page
@@ -18,4 +19,5 @@ type Model = {
     loginBox: LoginBox.Model
     admin: AdminModel
     board: ProjectDashboard.Model
+    compare: CompareDetail.Model
   }

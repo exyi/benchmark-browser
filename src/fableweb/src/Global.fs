@@ -1,5 +1,6 @@
 module Global
 open Admin.Global
+open PublicModel.PerfReportModel
 
 type Page =
   | Home
@@ -9,6 +10,7 @@ type Page =
   | ProjectDashboard of id: string
   | TaskDashboard of id: string
   | EnqueueTask of projectId: string
+  | CompareDetail of versionA: ReportGroupSelector * versionB: ReportGroupSelector
 
 let toHash page =
   match page with
@@ -22,3 +24,7 @@ let toHash page =
   | ProjectDashboard id -> sprintf "#board/%s" id
   | EnqueueTask taskId -> sprintf "#taskBoard/%s/newTask" taskId
   | TaskDashboard taskId -> sprintf "#taskBoard/%s" taskId
+  | CompareDetail (ReportGroupSelector.Version version, ReportGroupSelector.Version versionB) when version = versionB ->
+       sprintf "#detail/commit/%s" version
+  | CompareDetail (ReportGroupSelector.Version versionA, ReportGroupSelector.Version versionB) ->
+       sprintf "#compare/commits/%s/%s" versionA versionB

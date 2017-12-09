@@ -10,14 +10,33 @@ open System.Threading.Tasks
 open PublicModel
 open Newtonsoft.Json
 open DataAccess.FileStorage
+open System
 
 let json (dataObj : obj) : HttpHandler =
     setHttpHeader "Content-Type" "application/json"
     >=> setBodyAsString (Newtonsoft.Json.JsonConvert.SerializeObject(dataObj, Fable.Remoting.Json.FableJsonConverter()))
 
+type LongToStringJsonConverter() = class
+    inherit JsonConverter()
+
+    override x.CanRead = true
+    override x.CanWrite = true
+    override x.CanConvert(t: Type) = t = typeof<Int64>;
+
+    override x.WriteJson(writer: JsonWriter, value: obj, serializer: JsonSerializer) =
+        let number : Int64 = unbox value
+        writer.WriteValue(number.ToString(Globalization.CultureInfo.InvariantCulture))
+        ()
+
+    override x.ReadJson(reader: JsonReader, t: Type, existingValue: obj, serializer: JsonSerializer) =
+        let str = reader.ReadAsString()
+        Int64.Parse str |> box
+end
+
 let serveFunction (f: (HttpContext -> 'a -> Task<'b>)) =
     fun (next : HttpFunc) (ctx : HttpContext) ->
         let serializerSettings = JsonSerializerSettings()
+        serializerSettings.Converters.Add(LongToStringJsonConverter())
         serializerSettings.Converters.Add(Fable.JsonConverter())
         task {
             let! model = ctx.BindJson<'a>(serializerSettings)
@@ -28,6 +47,7 @@ let serveFunction (f: (HttpContext -> 'a -> Task<'b>)) =
 let serveGetFunction (f: (HttpContext -> Task<'a>)) =
     fun (next : HttpFunc) (ctx : HttpContext) ->
         let serializerSettings = JsonSerializerSettings()
+        serializerSettings.Converters.Add(LongToStringJsonConverter())
         serializerSettings.Converters.Add(Fable.JsonConverter())
         task {
             let! result = f ctx
@@ -70,6 +90,8 @@ let webApp : HttpHandler =
         routeCi "/home" >=> serveGetFunction (TestReports.getHomeModel)
         routeCi "/testdef/dashboard" >=> serveFunction (TestReports.dashboard)
         routeCi "/project/dashboard" >=> serveFunction (TestReports.projectDashboard)
+        routeCi "/getReports" >=> serveFunction (TestReports.getReportGroup)
+        routeCi "/compareReports" >=> serveFunction (TestReports.compareReportGroups)
         routeCi "/enqueueTask" >=> requireAuth ["Admin"] >=> serveFunction (WorkerHub.enqueueWorkerTask)
         routeCif "/pushFile/%s" (fun id -> requireAuth ["Worker"] >=> serveGetFunction (WorkerHub.pushFile StoredFileType.AnyAttachement id))
         routeCif "/pushFile_stacks/%s" (fun id -> requireAuth ["Worker"] >=> serveGetFunction (WorkerHub.pushFile StoredFileType.CollectedStacks_Text id))

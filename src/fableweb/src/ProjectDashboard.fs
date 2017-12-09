@@ -71,21 +71,21 @@ let displayProject (model: ResultProjectListItem) =
         div [ ] [ str <| sprintf "%d tasks | %d reports | %d definitions | %d versions" model.TasksRun model.ReportCount model.TestDefinitionCount model.VersionsTested ]
       ]
 
-let viewRelativePerf (model: CommitRelativePerformance) =
-    let displayNum (num: float) title =
-        if num > 1.0001 then
-            span [ Style [ Color "hsl(141, 71%, 48%)"]; Title title ] [ str (sprintf "%.2g%%" (num * 100.0 - 100.0)) ]
-        else if num < 0.9999 then
-            span [ Style [ Color "hsl(348, 100%, 61%)"]; Title title ] [ str (sprintf "%.2g%%" (num * 100.0 - 100.0)) ]
+let displayPercents (num: float) title =
+        if num > 1.001 then
+            span [ Style [ Color "hsl(141, 71%, 48%)"]; Title title ] [ str (sprintf "%.3g%%" (num * 100.0 - 100.0)) ]
+        else if num < 0.999 then
+            span [ Style [ Color "hsl(348, 100%, 61%)"]; Title title ] [ str (sprintf "%.3g%%" (num * 100.0 - 100.0)) ]
         else
             span [ Title title] [ str "~" ]
 
+let viewRelativePerf (model: CommitRelativePerformance) =
     span [] [
-        displayNum model.MinTime "Min"
+        displayPercents model.MinTime "Min"
         str " / "
-        displayNum model.AvgTime "Avg"
+        displayPercents model.AvgTime "Avg"
         str " / "
-        displayNum model.MaxTime "Max"
+        displayPercents model.MaxTime "Max"
 
         str (sprintf " (%d tests)" model.Count)
     ]
@@ -131,6 +131,7 @@ let viewPerfData (model: ProjectPerfSummary) =
 
         yield viewTestedHeads model.HeadOnlyBranches
     ]
+
 
 let viewTestReport (model: TestRunListModel) =
     tr [ ClassName "tr" ] [
