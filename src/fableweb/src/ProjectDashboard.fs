@@ -129,7 +129,8 @@ let viewPerfData (model: ProjectPerfSummary) =
         for i in model.DetailedBranches do
             yield viewBranchTrend i
 
-        yield viewTestedHeads (model.DetailedBranches |> Seq.head |> snd |> Seq.head |> fst) model.HeadOnlyBranches
+        if model.DetailedBranches.Length > 0 then
+            yield viewTestedHeads (model.DetailedBranches |> Seq.head |> snd |> Seq.head |> fst) model.HeadOnlyBranches
     ]
 
 
@@ -190,5 +191,5 @@ let viewEnqueueForm id (model: WorkerModel.WorkerQueueItemFormModel, isLoading: 
     form [ OnSubmit submit ] [
         FormGenerator.createForm model (dispatch << UpdateMsg'.lift fst (fun (_, isLoading) x -> (x, isLoading)))
         button [ClassName (sprintf "button is-primary %s" (if isLoading then "is-loading" else ""))] [ str "Ok" ]
-        a [ ClassName "button"; Href (sprintf "#board/%s" id) ] [ str "Back" ]
+        a [ ClassName "button"; Href (sprintf "#taskBoard/%s" id) ] [ str "Back" ]
     ]

@@ -196,7 +196,7 @@ let private getVersionComparison a b (s:IDocumentSession) = task {
     let load (commit, count) = getVersionData commit count s |> liftTask (Seq.map (fun v -> v.Data))
     let! loadedA = load a
     let! loadedB = load b
-    return VersionComparer.compareVersions VersionComparer.ComparisonOptions.Default loadedA loadedB
+    return VersionComparer.compareVersions ComparisonOptions.Default loadedA loadedB
 }
 
 let private createPerfSummary testedVersions (repoStructure: CompleteRepoStructure) dbSession =
@@ -227,25 +227,27 @@ let private createPerfSummary testedVersions (repoStructure: CompleteRepoStructu
 let getProjectDashboard (uid:Guid) (pid:string) (s: IDocumentSession) = task {
     let! projectRows = getProjects "row.RootCommit = ?" [| pid |] s
     let p = projectRows |> createProjectListItems
-    assert (p.Length = 1)
-    let! testDefs = s.LoadManyAsync(projectRows |> Seq.map (fun p -> p.TestDefId) |> Seq.toArray)
-    let! testedVersions = getTestedVersions (projectRows.[0].RootCommit) s
-    let repoStructure = getRepoStructure testedVersions
+    if p.Length = 0 then
+        return Error "Project was not found"
+    else
+        let! testDefs = s.LoadManyAsync(projectRows |> Seq.map (fun p -> p.TestDefId) |> Seq.toArray)
+        let! testedVersions = getTestedVersions (projectRows.[0].RootCommit) s
+        let repoStructure = getRepoStructure testedVersions
 
-    let! summary = createPerfSummary testedVersions repoStructure s
+        let! summary = createPerfSummary testedVersions repoStructure s
 
-    return Ok
-        {
-            DashboardModel.DetailedTestDef = None
-            TaskDefinitions = testDefs |> createTestDefListItems |> Seq.toArray
-            Projects = p
-            FewRecentTestRuns =
-                testedVersions
-                |> Seq.map (createTestedVersionModel (fun id -> (Seq.find (fun (e: TestDefEntity) -> e.Id = id) testDefs).FriendlyId))
-                |> Seq.map (fun m -> { m with ProjectVersionBranch = Map.tryFind m.ProjectVersion repoStructure.NearesHeads |> Option.defaultValue "" })
-                |> Seq.toArray
-            PerfSummary = summary
-        }
+        return Ok
+            {
+                DashboardModel.DetailedTestDef = None
+                TaskDefinitions = testDefs |> createTestDefListItems |> Seq.toArray
+                Projects = p
+                FewRecentTestRuns =
+                    testedVersions
+                    |> Seq.map (createTestedVersionModel (fun id -> (Seq.find (fun (e: TestDefEntity) -> e.Id = id) testDefs).FriendlyId))
+                    |> Seq.map (fun m -> { m with ProjectVersionBranch = Map.tryFind m.ProjectVersion repoStructure.NearesHeads |> Option.defaultValue "" })
+                    |> Seq.toArray
+                PerfSummary = summary
+            }
 }
 
 let getTestDefDashboard (uid: Guid) (pid:string) (s: IDocumentSession) = task {
@@ -263,7 +265,7 @@ let getTestDefDashboard (uid: Guid) (pid:string) (s: IDocumentSession) = task {
                 FewRecentTestRuns = [||] // TODO
                 PerfSummary = { PerfReportModel.ProjectPerfSummary.DetailedBranches = [||]; HeadOnlyBranches = [||] }
             }
-    | None -> return Error ("")
+    | None -> return Error ("Task definiton not found")
 }
 
 let getReportGroups a session = task {
@@ -276,6 +278,6 @@ let getReportGroups a session = task {
 let compareGroups a b session = task {
     let! vA = getReportGroups a session
     let! vB = getReportGroups b session
-    let cmp = VersionComparer.compareVersions VersionComparer.ComparisonOptions.Default (vA) (vB)
+    let cmp = VersionComparer.compareVersions ComparisonOptions.Default (vA) (vB)
     return cmp, vA, vB
 }

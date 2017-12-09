@@ -64,7 +64,9 @@ module LoadableData' =
         (Cmd.ofPromise
             refreshFunction arg
             (UpdateMsg'.replace << LoadableData.Loaded)
-            (fun e -> System.Diagnostics.Debugger.Break(); UpdateMsg'.replace <| LoadableData.Error (sprintf "Loading error %s" (e.ToString()))))
+            (fun e ->
+                // System.Diagnostics.Debugger.Break();
+                UpdateMsg'.replace <| LoadableData.Error (sprintf "Loading error %s" (e.Message))))
 
     let display model dispatch viewData refreshFunction =
         let refreshDispatch () =
@@ -144,7 +146,7 @@ module Components =
                 this.setState( {Open = state.Open |> not} )
                 ev.preventDefault()
 
-            div [Props.HTMLAttr.ClassName ("dropdown " + (if state.Open then "is-active" else ""))] [
+            div [Props.HTMLAttr.ClassName ("dropdown " +#board (if state.Open then "is-active" else ""))] [
                 div [Props.HTMLAttr.ClassName "dropdown-trigger"; Props.DOMAttr.OnClick click ] [
                     this.props.Title
                 ]
