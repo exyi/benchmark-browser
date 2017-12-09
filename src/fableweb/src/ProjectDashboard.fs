@@ -175,9 +175,6 @@ let viewTask roleOracle id (model: Model) dispatch =
 
 let viewProject roleOracle id (model: Model) dispatch =
     LoadableData'.display model.Test (dispatch << Model.LiftTestMsg) (viewCore roleOracle) (fun () -> ApiClient.loadProjectDashboard id |> expectResultPromise)
-
-
-
 let viewEnqueueForm id (model: WorkerModel.WorkerQueueItemFormModel, isLoading: bool) dispatch =
     let submit (ev: FormEvent) =
         dispatch (UpdateMsg (fun (model, _isLoading) ->

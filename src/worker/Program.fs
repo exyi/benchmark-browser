@@ -194,8 +194,8 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
         for f in unknownFields do
             let path = getPath f
             if not <| path.StartsWith("Columns.") && f.Value :? JValue then
-                if f.Value.Type <> JTokenType.String && path.Contains ".Statistics." && not <| (path.EndsWith ".N" || path.EndsWith ".Kurtosis" || path.EndsWith ".Skewness") then
-                    results.Add (path, (f.Value.Value<float>() / 1000.0) |> TimeSpan.FromMilliseconds |> TestResultValue.Time)
+                if f.Value.Type <> JTokenType.String && path.Contains "Statistics." && not <| (path.EndsWith ".N" || path.EndsWith ".Kurtosis" || path.EndsWith ".Skewness") then
+                    results.Add (path, (f.Value.Value<float>() / 1000000.0) |> TimeSpan.FromMilliseconds |> TestResultValue.Time)
                 else if f.Value.Type = JTokenType.String then
                     results.Add (path, TestResultValue.Anything <| f.Value.Value<string>())
                 else if f.Value.Type = JTokenType.Boolean then
@@ -217,6 +217,10 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
                 let legend = globalJson.["Columns"].[propName] :?> JObject
                 match legend.["UnitType"].Value<string>() with
                 | "Dimensionless" ->
+                    if propName.Contains "TimeFraction" then
+                        let isPercent = legend.["Legend"].Value<string>().Contains "%"
+                        let value = (v.Value<string>() |> Double.Parse) / (if isPercent then 100.0 else 1.0)
+                        results.Add("Columns." + propName, TestResultValue.Fraction (value, Some "Statistics.Mean"))
                     if legend.["IsNumeric"].Value<bool>() then
                         results.Add("Columns." + propName, TestResultValue.Number (v.Value<string>() |> Double.Parse, None))
                     else if legend.["IsFileName"].Value<bool>() then

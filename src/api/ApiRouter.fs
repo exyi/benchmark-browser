@@ -12,32 +12,38 @@ open Newtonsoft.Json
 open DataAccess.FileStorage
 open System
 
-let json (dataObj : obj) : HttpHandler =
-    setHttpHeader "Content-Type" "application/json"
-    >=> setBodyAsString (Newtonsoft.Json.JsonConvert.SerializeObject(dataObj, Fable.Remoting.Json.FableJsonConverter()))
-
-type LongToStringJsonConverter() = class
+type FableHacksJsonConverter() = class
     inherit JsonConverter()
 
     override x.CanRead = true
     override x.CanWrite = true
-    override x.CanConvert(t: Type) = t = typeof<Int64>;
+    override x.CanConvert(t: Type) =
+        t = typeof<TimeSpan>;
 
     override x.WriteJson(writer: JsonWriter, value: obj, serializer: JsonSerializer) =
-        let number : Int64 = unbox value
-        writer.WriteValue(number.ToString(Globalization.CultureInfo.InvariantCulture))
+        let number : TimeSpan = unbox value
+        writer.WriteValue(number.TotalMilliseconds)
         ()
 
     override x.ReadJson(reader: JsonReader, t: Type, existingValue: obj, serializer: JsonSerializer) =
-        let str = reader.ReadAsString()
-        Int64.Parse str |> box
+        let num = reader.ReadAsDouble()
+        box <| TimeSpan.FromMilliseconds num.Value
 end
+
+let converters = [|
+        FableHacksJsonConverter() :> JsonConverter
+        Fable.JsonConverter() :> JsonConverter
+    |]
+
+let json (dataObj : obj) : HttpHandler =
+    setHttpHeader "Content-Type" "application/json"
+    >=> setBodyAsString (Newtonsoft.Json.JsonConvert.SerializeObject(dataObj, converters))
 
 let serveFunction (f: (HttpContext -> 'a -> Task<'b>)) =
     fun (next : HttpFunc) (ctx : HttpContext) ->
         let serializerSettings = JsonSerializerSettings()
-        serializerSettings.Converters.Add(LongToStringJsonConverter())
-        serializerSettings.Converters.Add(Fable.JsonConverter())
+        for c in converters do
+            serializerSettings.Converters.Add c
         task {
             let! model = ctx.BindJson<'a>(serializerSettings)
             let! result = f ctx model
@@ -47,8 +53,8 @@ let serveFunction (f: (HttpContext -> 'a -> Task<'b>)) =
 let serveGetFunction (f: (HttpContext -> Task<'a>)) =
     fun (next : HttpFunc) (ctx : HttpContext) ->
         let serializerSettings = JsonSerializerSettings()
-        serializerSettings.Converters.Add(LongToStringJsonConverter())
-        serializerSettings.Converters.Add(Fable.JsonConverter())
+        for c in converters do
+            serializerSettings.Converters.Add c
         task {
             let! result = f ctx
             return! json result next ctx

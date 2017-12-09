@@ -40,7 +40,7 @@ let urlUpdate (result: Option<Page>) model =
       | ProjectDashboard id -> {model with board = ProjectDashboard.initState}, Cmd.map Msg.BoardMsg (Cmd.map ProjectDashboard.Model.LiftTestMsg (LoadableData'.loadData (expectResultPromise << ApiClient.loadProjectDashboard) id))
       | TaskDashboard id -> {model with board = ProjectDashboard.initState}, Cmd.map Msg.BoardMsg (Cmd.map ProjectDashboard.Model.LiftTestMsg (LoadableData'.loadData (expectResultPromise << ApiClient.loadTestDefDashboard) id))
       | CompareDetail (vA, vB) ->
-          { model with compare = CompareDetail.initState },
+          { model with compare = { model.compare with Data = LoadableData.Loading } },
           Cmd.map Msg.CompareMsg (Cmd.map CompareDetail.Model.LiftDataMsg (LoadableData'.loadData (CompareDetail.ComparisonData.Load) (vA, vB)))
       | _ -> model, []
 
