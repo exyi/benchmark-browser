@@ -21,9 +21,17 @@ with
     static member GetComparable =
         function
         | Time s -> Some s.TotalMilliseconds
-        | ByteSize s -> Some (float s)
+        | ByteSize s -> Some s
         | Number (a, _) -> Some a
         | Fraction (a, _) -> Some a
+        | _ -> None
+
+    static member TryScaleBy (num: float) =
+        function
+        | Time s -> TimeSpan.FromMilliseconds(s.TotalMilliseconds * num) |> Time |> Some
+        | ByteSize s -> s * num |> ByteSize |> Some
+        | Number (a, units) -> Number (a * num, units) |> Some
+        | Fraction (a, frOf) -> Fraction (a * num, frOf) |> Some
         | _ -> None
 
 [<CLIMutableAttribute>]

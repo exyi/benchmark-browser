@@ -10,6 +10,7 @@ open System.Threading
 open Fable.Import.RemoteDev.MsgTypes
 open Fable.Import.React
 open Fable.PowerPack
+open System.Text.RegularExpressions
 
 
 type UpdateMsg<'a> = | UpdateMsg of ('a -> 'a * Cmd<UpdateMsg<'a>>)
@@ -99,3 +100,74 @@ let displayStrings a =
         span [ Props.HTMLAttr.Title (String.Join(" | ", a |> Seq.ofArray)) ] [ str (a.[0] + ", ...") ]
     else
         str a.[0]
+
+let (closeDropdown, registerDropDown, removeDropDown) =
+    let mutable queue : (unit -> unit) list = []
+    let add handler = queue <- handler :: queue
+    let pop () =
+        match queue with
+        | head :: tail -> queue <- tail; Some head
+        | _ -> None
+    let remove (handler: unit -> unit) = queue <- List.filter (fun x -> obj.ReferenceEquals(x, handler)) queue
+
+    (
+        (fun () -> (pop ()) |> Option.map (fun x -> x ()) |> ignore),
+        add,
+        remove
+    )
+
+module Components =
+    open Fable.Import.React
+    open Fable.Helpers.React
+    [<Pojo>]
+    type DropDownProps = {
+        Title: ReactElement
+        Body: Lazy<ReactElement list>
+    }
+    [<Pojo>]
+    type DropDownState = {
+        Open: bool
+    }
+    type DropDown(props) as this =
+        inherit Component<DropDownProps,DropDownState>(props)
+
+        let closeHandler = (fun () -> this.setState({Open = false}))
+        member this.render () =
+            let state : DropDownState = this.state |> box |> Option.ofObj |> Option.defaultValue(box {Open = false}) |> unbox
+
+            let click (ev: MouseEvent) =
+                if state.Open then
+                    // closing
+                    removeDropDown closeHandler
+                else
+                    registerDropDown closeHandler
+                this.setState( {Open = state.Open |> not} )
+                ev.preventDefault()
+
+            div [Props.HTMLAttr.ClassName ("dropdown " + (if state.Open then "is-active" else ""))] [
+                div [Props.HTMLAttr.ClassName "dropdown-trigger"; Props.DOMAttr.OnClick click ] [
+                    this.props.Title
+                ]
+                div [Props.HTMLAttr.ClassName "dropdown-menu"] [
+                    div [Props.HTMLAttr.ClassName "dropdown-content"]
+                        (if state.Open then
+                             (this.props.Body.Value |> List.map (fun e -> div [ Props.HTMLAttr.ClassName "dropdown-item" ] [ e ]))
+                         else [])
+                ]
+            ]
+
+
+open Components
+let dropDownMenu title body =
+    let props = { DropDownProps.Title = title; Body = body }
+    createElement(typedefof<DropDown>, props, [])
+
+let littleDropDownIcon =
+    // button [ Props.HTMLAttr.ClassName "button is-small" ] [
+        span [ Props.HTMLAttr.ClassName"icon is-small"] [
+            i [Props.HTMLAttr.ClassName "fa fa-angle-down"] []
+        ]
+    // ]
+let dropDownLittleMenu body =
+    dropDownMenu (littleDropDownIcon) body
+

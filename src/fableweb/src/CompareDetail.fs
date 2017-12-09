@@ -5,18 +5,90 @@ open Utils
 open PublicModel.PerfReportModel
 open PublicModel.PerfReportModel
 open Fable.PowerPack
-open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
 open System.Globalization
-open PublicModel.PerfReportModel
 open System
-open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
-open Fable.PowerPack.Experimental.IndexedDB
 open System.Data.Common
+open Fable.Import
+open Fable.PowerPack.Json
+open System.Collections.Generic
+open Elmish
+open Fable.Import.React
+open Fable.Core.JsInterop
+
+[<RequireQualifiedAccess>]
+type GridColumnValueGetter =
+    | ResultValue of id: string
+    | EnvironmentValue of id: string
+    | ParameterValue of id: string
+    | TaskName
+    | TaskClass
+    | TaskMethod
+    | ScaledResultValue of baseGetter: GridColumnValueGetter
+
+with
+    member x.Eval (s: WorkerSubmission) =
+        let splitLastSegment (str: string) =
+            let lastDot = str.LastIndexOf('.')
+            if lastDot > 0 then str.Remove(lastDot), str.Substring(lastDot + 1)
+            else "", str
+
+        let someString a = Some (TestResultValue.Anything a)
+
+        match x with
+        | ResultValue col -> Map.tryFind col s.Results
+        | EnvironmentValue col -> Map.tryFind col s.Environment |> Option.bind someString
+        | ParameterValue col -> Map.tryFind col s.TaskParameters |> Option.bind someString
+        | TaskName -> s.TaskName |> someString
+        | TaskClass -> s.TaskName |> splitLastSegment |> fst |> splitLastSegment |> snd |> someString
+        | TaskMethod -> s.TaskName |> splitLastSegment |> snd |> someString
+        | ScaledResultValue col ->
+            // Option.map2 (fun value scaler -> ) (value.Eval s) (scaler.Eval s)
+            let value = col.Eval s
+                        |> Option.bind(function | TestResultValue.Fraction (value, Some scaledCol) -> Some (value, scaledCol) | _ -> None)
+                        |> Option.bind(fun (fraction, scaledCol) -> Map.tryFind scaledCol s.Results |> Option.bind (TestResultValue.TryScaleBy fraction))
+            value
+
+type GridColumnDescriptor = {
+    Legend: string
+    Title: string
+    Getter: GridColumnValueGetter
+}
+
+type GridLayoutSettings = {
+    Columns: GridColumnDescriptor[]
+    InactiveColumns: GridColumnDescriptor[]
+}
+with
+    static member Empty = { Columns = [||]; InactiveColumns = [||] }
+    member x.AddColumnsFromData (data: WorkerSubmission[]) =
+        let mapMap (ctor: string -> 'b) (theMap: Map<string, 'a>) : seq<string * 'b> =
+            theMap |> Map.toSeq |> Seq.map fst |> Seq.distinct |> Seq.map (fun x -> x, ctor x)
+        let baseCols = Seq.concat [
+                             seq [
+                                 "Task name", GridColumnValueGetter.TaskName
+                                 "Task method", GridColumnValueGetter.TaskMethod
+                                 "Task class", GridColumnValueGetter.TaskClass
+                             ]
+                             data |> Seq.collect (fun a -> a.Results |> mapMap GridColumnValueGetter.ResultValue)
+                             data |> Seq.collect (fun a -> a.Environment |> mapMap GridColumnValueGetter.EnvironmentValue)
+                             data |> Seq.collect (fun a -> a.TaskParameters |> mapMap GridColumnValueGetter.EnvironmentValue)
+                         ] |> Seq.distinct |> Seq.toArray
+        let columns = baseCols |> Seq.collect(fun (colId, getter) -> seq {
+            yield { GridColumnDescriptor.Legend = colId; Title = colId; Getter = getter }
+
+            let value = data |> Seq.tryPick getter.Eval
+            match value with
+            | Some (TestResultValue.Fraction (_, Some column)) ->
+                let legend = sprintf "%s scaled by %s" column colId
+                yield { GridColumnDescriptor.Legend = legend; Title = "Scaled " + colId; Getter = GridColumnValueGetter.ScaledResultValue getter }
+            | _ -> ()
+        })
+
+        let thisColMap = Seq.append x.Columns x.InactiveColumns |> Set
+
+        let newCols = columns |> Seq.filter (fun x -> not <| Set.contains x thisColMap) |> Seq.toArray
+
+        { x with Columns = Array.append x.Columns newCols }
 
 type ComparisonData = {
     Comparison: VersionComparisonSummary
@@ -30,13 +102,35 @@ with
         )
 
 type Model = {
-    wtf: string
     Data: LoadableData<ComparisonData>
+    GridSettings: GridLayoutSettings
 }
 with
-    static member LiftDataMsg = UpdateMsg'.lift (fun x -> x.Data) (fun m x -> { m with Data = x })
+    static member LiftDataMsg = UpdateMsg'.lift (fun x -> x.Data) (fun m x ->
+        if m.Data = x then
+            m
+        else
+            let rows =
+                match x with
+                | LoadableData.Loaded d -> Array.append d.Target d.Base
+                | _ -> [||]
+            let settings = m.GridSettings.AddColumnsFromData (rows)
+            { m with Data = x; GridSettings = settings })
+    static member LiftSettingsMsg = UpdateMsg'.lift (fun x -> x.GridSettings) (fun m x -> { m with GridSettings = x })
+module SortableImport = 
+    let SortableContainer : System.Func<obj -> ReactElement, ComponentClass<obj>> = Fable.Core.JsInterop.import "SortableContainer" "react-sortable-hoc"
+    let SortableElement : System.Func<obj -> ReactElement, ComponentClass<obj>> = Fable.Core.JsInterop.import "SortableElement" "react-sortable-hoc"
+    let arrayMove : ('a [] -> int -> int -> 'a[])  = Fable.Core.JsInterop.import "arrayMove" "react-sortable-hoc"
 
-let initState = { wtf = ""; Data = LoadableData.Loading }
+open SortableImport
+
+let initState =
+    let storedSettings =
+        Browser.localStorage.getItem "detail-grid-layout" :?> string
+        |> Option.ofObj
+        |> Option.map (Fable.Core.JsInterop.ofJson)
+        |> Option.defaultValue GridLayoutSettings.Empty
+    { Data = LoadableData.Loading; GridSettings = storedSettings }
 
 let viewComparisonSummary (model: VersionComparisonSummary) =
     let colNames = model.SummaryGroups |> Map.toSeq |> Seq.collect (fun (_key, v: PerfSummaryGroup) -> v.ColumnSummary |> Map.toSeq |> Seq.map fst) |> Seq.distinct |> Seq.toArray
@@ -76,12 +170,11 @@ let private viewValue =
     | TestResultValue.Number (num, units) -> str (sprintf "%g%s" num (units |> Option.defaultValue ""))
     | x -> str (sprintf "%A" x)
 
-let viewRows (tuples: (WorkerSubmission * WorkerSubmission) array) =
-    let columns = tuples |> Seq.collect (fun (a, b) -> [a; b]) |> Seq.collect (fun a -> a.Results |> Map.toSeq |> Seq.map fst) |> Seq.distinct |> Seq.toArray
+let viewResultsGrid (tuples: (WorkerSubmission * WorkerSubmission) array) (settings: GridLayoutSettings) settingsDispatch =
     let rows = tuples |> Seq.map (fun (a, b) ->
-        let cols = columns |> Array.map (fun c ->
-            let colA = a.Results.TryFind c
-            let colB = b.Results.TryFind c
+        let cols = settings.Columns |> Array.map (fun c ->
+            let colA = c.Getter.Eval a
+            let colB = c.Getter.Eval b
 
             let content =
                 match (colA, colB) with
@@ -99,31 +192,71 @@ let viewRows (tuples: (WorkerSubmission * WorkerSubmission) array) =
             td [ ClassName "td" ] content
         )
 
-        let cols = cols |> Seq.append [
-                       th [ ClassName "th" ] [ str a.TaskName ]
-                   ]
-
         tr [ ClassName "tr" ] (Seq.toList cols)
     )
 
+    let removeColumn column =
+        closeDropdown ()
+        settingsDispatch (UpdateMsg (fun m ->
+            let cols = m.Columns |> Array.except [ column ]
+            { m with Columns = cols; InactiveColumns = Array.append [| column |] m.InactiveColumns }, Cmd.none))
+    let swapColumns oldIndex newIndex =
+        printfn "Moving from %d to %d" oldIndex newIndex
+        closeDropdown ()
+        settingsDispatch (UpdateMsg (fun m ->
+            let cols = arrayMove m.Columns oldIndex newIndex
+            { m with Columns = cols }, Cmd.none))
+
+    let headerMenu (column: GridColumnDescriptor) =
+        [
+            p [] [ str column.Legend ]
+            button [ ClassName "button"; OnClick (fun ev -> removeColumn column; ev.preventDefault()) ] [ str "Remove" ]
+        ]
+
+    let sortableHeaderItem =
+        let headerItem col =
+                span [] [ str col.Title ]
+        SortableElement.Invoke(fun o -> headerItem (!!o?value))
+
+    let headerRow (columns: GridColumnDescriptor []) =
+        columns |> Seq.mapi (fun index col ->
+            th [ ClassName "th"; Title col.Legend ] [
+                createElement(
+                    sortableHeaderItem,
+                    createObj [
+                        "key" ==> ("item-" + string index)
+                        "value" ==> col
+                        "index" ==> index
+                    ], [||])
+                Utils.dropDownLittleMenu (lazy (headerMenu col))
+            ]
+        )
+        |> Seq.toList
+        |> tr [ ClassName "tr" ]
+
+    let sortableHeaders = SortableContainer.Invoke (fun o -> headerRow (!! o?items))
+
     table [ ClassName "table" ] [
         thead [ ClassName "thead" ] [
-            tr [ ClassName "tr" ] [
-                yield th [ ClassName "th" ] []
-                for col in columns do
-                    yield th [ ClassName "th" ] [ str col ]
-            ]
+            createElement (
+                sortableHeaders,
+                createObj [
+                    "items" ==> settings.Columns
+                    "onSortEnd" ==> (fun data _mouseEvent -> swapColumns (!!data?oldIndex) (!!data?newIndex))
+                    "lockAxis" ==> true
+                    "axis" ==> "x"
+                ], [||])
         ]
         tbody [ ClassName "tbody" ] (Seq.toList rows)
     ]
 
-let viewData (model: ComparisonData) dispatch =
+let viewData (model: ComparisonData) gridSettings gridSettingsDispatch =
     let aMap = model.Base |> Seq.map (fun x -> createMappingKey x, x) |> Map.ofSeq
     let pairs = model.Target |> Seq.choose (fun x -> Map.tryFind (createMappingKey x) aMap |> Option.map (fun a -> a, x)) |> Seq.toArray
     div [] [
         viewComparisonSummary model.Comparison
         div [ Style [ MaxWidth "90vw"; OverflowX "scroll" ] ] [
-            viewRows pairs
+            viewResultsGrid pairs gridSettings gridSettingsDispatch
         ]
     ]
 
@@ -141,5 +274,5 @@ let view (verA, verB) model dispatch =
                 [ str "Detail of "; displayGroupSpec verA ]
         )
 
-        LoadableData'.display model.Data (Model.LiftDataMsg >> dispatch) viewData (fun _ -> ComparisonData.Load (verA, verB))
+        LoadableData'.display model.Data (Model.LiftDataMsg >> dispatch) (fun data _ -> viewData data model.GridSettings (Model.LiftSettingsMsg >> dispatch)) (fun _ -> ComparisonData.Load (verA, verB))
     ]
