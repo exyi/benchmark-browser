@@ -138,6 +138,7 @@ open PublicModel.PerfReportModel
 open System.Data.Common
 open PublicModel.PerfReportModel
 open System.Data
+open Fable.PowerPack.PromiseSeq
 
 let initState =
     let storedSettings =
@@ -175,9 +176,27 @@ let viewComparisonSummary (model: VersionComparisonSummary) =
         ]
 
 let private viewValue =
+    let pickUnits (units: string[]) multiplier value =
+        units
+        |> Seq.mapi (fun index unit -> value / (multiplier ** float index), unit)
+        |> Seq.filter (fun (v, _) -> v < 10000.0)
+        |> Seq.tryHead
+        |> Option.defaultWith (fun _ -> value / (multiplier ** float units.Length), Array.last units)
+
+
     function
     | TestResultValue.Anything a -> str a
     | TestResultValue.Number (num, units) -> str (sprintf "%g%s" num (units |> Option.defaultValue ""))
+    | TestResultValue.Time (time) ->
+        let micros = time.TotalMilliseconds * 1000.0
+        let (value, units) = pickUnits [| "µs"; "ms"; "s" |] 1000.0 micros
+        str (sprintf "%.4g%s" value units)
+    | TestResultValue.ByteSize (bytes) ->
+        let (value, units) = pickUnits [| "B"; "kiB"; "MiB"; "GiB"; "TiB" |] 1024.0 bytes
+        str (sprintf "%.4g%s" value units)
+    | TestResultValue.Fraction (fraction, frOf) ->
+        let percent = fraction * 100.0
+        span [ Title (sprintf "%.4g%% of %s" percent (frOf |> Option.defaultValue "")) ] [ str (sprintf "%.3g%%" percent) ]
     | x -> str (sprintf "%A" x)
 
 let viewFileColumns isCompare (tuples: (BenchmarkReport * BenchmarkReport) array) =
