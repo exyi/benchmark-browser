@@ -35,6 +35,5 @@ let root model dispatch =
   div
     [ ]
     [
-      h1 [] [ str "Tasks" ]
       Utils.LoadableData'.display model.Data (Model.LiftDataUpdate >> dispatch) viewData State.refreshData
     ]

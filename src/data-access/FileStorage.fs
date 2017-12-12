@@ -90,12 +90,12 @@ let getFlameGraph (args: Map<string, string[]>) (stacks: (string * int) seq) out
     let startInfo = System.Diagnostics.ProcessStartInfo("../../FlameGraph/flamegraph.pl", sprintf "--hash --title \"%s\" --colors \"%s\" --width \"%s\"" title colors width)
     startInfo.RedirectStandardInput <- true
     startInfo.RedirectStandardOutput <- true
-    let process = Diagnostics.Process.Start startInfo
+    let proc = Diagnostics.Process.Start startInfo
     for (s, count) in stacks do
-        process.StandardInput.WriteLine(sprintf "%s %d" s count)
-    process.StandardInput.Close()
-    do! process.StandardOutput.BaseStream.CopyToAsync outStream
-    process.WaitForExit(20*1000)
+        proc.StandardInput.WriteLine(sprintf "%s %d" s count)
+    proc.StandardInput.Close()
+    do! proc.StandardOutput.BaseStream.CopyToAsync outStream
+    proc.WaitForExit(20*1000) |> ignore
 }
 
 let archivers : Map<string, (Map<string, string[]> -> ((unit -> Task<IO.Stream>) * string) seq -> IO.Stream -> Task<unit>)> =

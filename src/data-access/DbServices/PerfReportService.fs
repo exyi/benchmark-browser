@@ -13,6 +13,10 @@ open System.Collections.Generic
 open VersionComparer
 open UserService
 open PublicModel.PerfReportModel
+open System.Collections.Generic
+open Fake.IO.File
+open Fake.Core.Globbing
+open Fake.Tools.Git.Rebase
 
 let private repoTmpPath = IO.Path.Combine(IO.Path.GetTempPath(), "benchmark-browser-repositories")
 
@@ -200,8 +204,78 @@ let private getVersionComparison a b (s:IDocumentSession) = task {
     return VersionComparer.compareVersions ComparisonOptions.Default loadedA loadedB
 }
 
+/// Does some magic to realistically sort the repository to branches...
+let private sortRepoToBranches (repoStructure: CompleteRepoStructure) =
+    let getNiceName (head: string) =
+        if head.StartsWith "refs/heads/" then head.Substring("refs/heads/".Length)
+        else head
+    // count how 'popular' each branch is by the number of occurences in merge commits
+    let branchesSorted = repoStructure.Heads |> Array.sortByDescending (fun (_commit, n) ->
+        let niceName = getNiceName n
+        let count = repoStructure.Commits
+                    |> Map.toSeq
+                    |> Seq.filter (fun (_, commit) ->
+                        commit.Parents.Length > 1 && commit.Subject.Contains(sprintf "Merge branch '%s'" niceName))
+                    |> Seq.length
+        count)
+
+    let result = Collections.Generic.Dictionary<string, string>()
+
+    for (headCommit, name) in branchesSorted do
+        let niceName = getNiceName name
+        let mutable commit = Some headCommit
+        while commit.IsSome && not (result.ContainsKey commit.Value) do
+            result.Add(commit.Value, name)
+            // follow only the first commit
+            let commitInfo = repoStructure.Commits.[commit.Value]
+
+            // this magic trick should eliminate harm from "personal" merge commits
+            let skipParent = commitInfo.Parents.Length > 1 && commitInfo.Subject.StartsWith (sprintf "Merge branch '%s'" niceName)
+
+            commit <- repoStructure.Commits.[commit.Value].Parents |> Seq.skip (if skipParent then 1 else 0) |> Seq.tryHead
+
+    // commits that were not in any branch
+    let orphanCommits = repoStructure.Commits |> Map.toSeq |> Seq.map fst |> Seq.filter (not << result.ContainsKey) |> HashSet
+
+    // try to resolve some names for the branches from names
+    let tryParseMergeName subject =
+        let maybeRegexes = [|
+            "^Merge branch \\'(?<name>.+)\\'"
+            "^Merge pull request \\#(?<prNum>\\d+) from (?<name>.+)$"
+        |]
+        maybeRegexes |> Array.tryPick (fun r ->
+            let m = Text.RegularExpressions.Regex.Match(subject, r)
+            if m.Success then
+                Some m
+            else None
+        )
+    let orphanMerges =
+        repoStructure.Commits
+        |> Map.toSeq
+        |> Seq.map snd
+        |> Seq.filter (fun c -> c.Parents.Length > 1 && c.Parents |> Seq.skip 1 |> Seq.exists orphanCommits.Contains)
+        |> Seq.choose (fun c ->
+            tryParseMergeName c.Subject
+            |> Option.map (fun m ->
+                if m.Groups.["prNum"].Success then
+                    c, sprintf "maybe/pr-%s-%s" m.Groups.["prNum"].Value m.Groups.["name"].Value
+                else
+                    c, sprintf "maybe/%s-%s" m.Groups.["name"].Value c.Hash
+            )
+        )
+
+    // follow the maybe-resolved branches
+    for (headCommit, name) in orphanMerges do
+        let mutable commit = headCommit.Parents |> Seq.tryFind orphanCommits.Contains
+        while commit.IsSome && not (result.ContainsKey commit.Value) do
+            result.Add(commit.Value, name)
+            commit <- repoStructure.Commits.[commit.Value].Parents |> Seq.tryHead
+    result
+
+
 let private createPerfSummary testedVersions (repoStructure: CompleteRepoStructure) dbSession =
-    let testedHeads = testedVersions |> Seq.groupBy (fun x -> Map.tryFind x.ProjectVersion repoStructure.NearesHeads |> Option.defaultValue "")
+    let sortedbranches = sortRepoToBranches repoStructure
+    let testedHeads = testedVersions |> Seq.groupBy (fun x -> match sortedbranches.TryGetValue(x.ProjectVersion) with (true, b) -> b | _ -> "")
     let masterTests =
         testedVersions.Join((repoStructure.LogFrom "refs/heads/master"), (fun x -> x.ProjectVersion), (fun x -> x.Hash), (fun a b -> a,b))
         |> Seq.sortByDescending (fun (_, c) -> c.Time)
