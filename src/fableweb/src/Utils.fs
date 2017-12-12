@@ -158,18 +158,48 @@ module Components =
                 ]
             ]
 
+    // [<Pojo>]
+    // type WidableProps = {
+    //     Body: ReactElement list
+    // }
+    // [<Pojo>]
+    // type WidableState = {
+    //     Open: bool
+    // }
+    // type Widable(props) as this =
+    //     inherit Component<WidableProps,WidableState>(props)
+
+    //     let closeHandler = (fun () -> this.setState({Open = false}))
+    //     member this.render () =
+    //         let state : DropDownState = this.state |> box |> Option.ofObj |> Option.defaultValue(box {Open = false}) |> unbox
+
+    //         let click (ev: MouseEvent) =
+    //             if state.Open then
+    //                 // closing
+    //                 removeDropDown closeHandler
+    //             else
+    //                 registerDropDown closeHandler
+    //             this.setState( {Open = state.Open |> not} )
+    //             ev.preventDefault()
+
+    //         div [Props.HTMLAttr.ClassName ("widable-panel " + (if state.Open then "is-active" else ""))] [
+    //             div [Props.HTMLAttr.ClassName "widable-left"; Props.DOMAttr.OnClick click ] [
+    //                 str "<"
+    //             ]
+    //             div [Props.HTMLAttr.ClassName "widable-content"] this.props.Body
+    //         ]
+
 
 open Components
 let dropDownMenu title body =
     let props = { DropDownProps.Title = title; Body = body }
     createElement(typedefof<DropDown>, props, [])
 
+let faIcon size icon = span [ Props.HTMLAttr.ClassName ("icon " + size) ] [ i [ Props.HTMLAttr.ClassName ("fa fa-" + icon) ] [] ]
+
 let littleDropDownIcon =
     // button [ Props.HTMLAttr.ClassName "button is-small" ] [
-        span [ Props.HTMLAttr.ClassName"icon is-small"] [
-            i [Props.HTMLAttr.ClassName "fa fa-angle-down"] []
-        ]
+        faIcon "is-small" "angle-down"
     // ]
 let dropDownLittleMenu body =
     dropDownMenu (littleDropDownIcon) body
-

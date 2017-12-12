@@ -1,6 +1,7 @@
 module Global
 open Admin.Global
 open PublicModel.PerfReportModel
+open System
 
 type Page =
   | Home
@@ -28,3 +29,8 @@ let toHash page =
        sprintf "#detail/commit/%s" version
   | CompareDetail (ReportGroupSelector.Version versionA, ReportGroupSelector.Version versionB) ->
        sprintf "#compare/commits/%s/%s" versionA versionB
+
+type PageOptions = {
+  IsFullWidth: bool
+}
+with static member Default = { IsFullWidth = false }

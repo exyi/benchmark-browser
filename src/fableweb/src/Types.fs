@@ -5,6 +5,7 @@ open Utils
 open Admin.Global
 
 type Msg =
+  | PageOptionsMsg of UpdateMsg<PageOptions>
   | CounterMsg of Counter.Types.Msg
   | HomeMsg of UpdateMsg<Home.Types.Model>
   | LoginMsg of UpdateMsg<LoginBox.Model>
@@ -14,6 +15,7 @@ type Msg =
 
 type Model = {
     currentPage: Page
+    pageOptions: PageOptions
     counter: Counter.Types.Model
     home: Home.Types.Model
     loginBox: LoginBox.Model

@@ -19,30 +19,35 @@ open Fable.Helpers.React.Props
 open Utils
 
 let menuItem label page currentPage =
-    li
-      [ ]
-      [ a
-          [ classList [ "is-active", page = currentPage ]
-            Href (toHash page) ]
-          [ str label ] ]
+    a
+      [ classList [ "is-link", page = currentPage; "button", true ]
+        Href (toHash page) ]
+      [ str label ]
 
-let menu currentPage userRoleOracle =
-  aside
-    [ ClassName "menu" ]
-    [ p
-        [ ClassName "menu-label" ]
-        [ str "General" ]
-      ul
-        [ ClassName "menu-list" ]
-        ([ menuItem "Home" Home currentPage
-           menuItem "Counter sample" Counter currentPage
-           menuItem "About" Page.About currentPage
+let menu currentPage userRoleOracle (options: PageOptions) optionsDispatch =
+  nav
+    [ ClassName "breadcrumb has-bullet-separator" ]
+    [ div [ ClassName "field is-grouped" ]
+        [
+           span [ ClassName "buttons has-addons" ] [
+             yield menuItem "Home" Home currentPage
+             yield menuItem "About" Page.About currentPage
+             if userRoleOracle "Admin" then
+                 yield menuItem "Create Task Definition" (Admin AdminPage.NewTaskDef) currentPage
+           ]
+           span [ Style [Width "20px"] ] []
+           a [
+               classList [ "is-link", options.IsFullWidth; "button", true ]
+               Href "#"
+               OnClick (fun e ->
+                  e.preventDefault()
+                  optionsDispatch (UpdateMsg (fun x -> { x with IsFullWidth = not options.IsFullWidth }, Cmd.none))
+               )
+              ] [
+                str "Full width"
+              ]
         ]
-        |> List.append
-             (if userRoleOracle "Admin" then [
-               menuItem "Create Task Definition" (Admin AdminPage.NewTaskDef) currentPage
-             ] else [])
-        ) ]
+    ]
 
 let root model dispatch =
 
@@ -74,15 +79,10 @@ let root model dispatch =
       div
         [ ClassName "section" ]
         [ div
-            [ ClassName "container" ]
-            [ div
-                [ ClassName "columns" ]
-                [ div
-                    [ ClassName "column is-3" ]
-                    [ menu model.currentPage (model.loginBox.HasRole) ]
-                  div
-                    [ ClassName "column" ]
-                    [ pageHtml model.currentPage ] ] ] ] ]
+            [ classList [ "container", not model.pageOptions.IsFullWidth] ]
+            [
+                menu model.currentPage (model.loginBox.HasRole) model.pageOptions (dispatch << PageOptionsMsg)
+                pageHtml model.currentPage ] ] ]
                     // [ FormGenerator.createForm model.loginBox (dispatch << LoginMsg) ] ] ] ] ]
 
 let w = Browser.window

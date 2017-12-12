@@ -11,29 +11,8 @@ open PublicModel
 open Newtonsoft.Json
 open DataAccess.FileStorage
 open System
-
-type FableHacksJsonConverter() = class
-    inherit JsonConverter()
-
-    override x.CanRead = true
-    override x.CanWrite = true
-    override x.CanConvert(t: Type) =
-        t = typeof<TimeSpan>;
-
-    override x.WriteJson(writer: JsonWriter, value: obj, serializer: JsonSerializer) =
-        let number : TimeSpan = unbox value
-        writer.WriteValue(number.TotalMilliseconds)
-        ()
-
-    override x.ReadJson(reader: JsonReader, t: Type, existingValue: obj, serializer: JsonSerializer) =
-        let num = reader.ReadAsDouble()
-        box <| TimeSpan.FromMilliseconds num.Value
-end
-
-let converters = [|
-        FableHacksJsonConverter() :> JsonConverter
-        Fable.JsonConverter() :> JsonConverter
-    |]
+open DataAccess
+open DatabaseOperation
 
 let json (dataObj : obj) : HttpHandler =
     setHttpHeader "Content-Type" "application/json"

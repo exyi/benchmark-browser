@@ -98,3 +98,4 @@ type HomePageModel = {
     Projects: ResultProjectListItem []
     FewRecentTestRuns: TestRunListModel []
 }
+

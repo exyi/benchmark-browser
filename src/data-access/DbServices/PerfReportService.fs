@@ -12,6 +12,7 @@ open System.Threading.Tasks
 open System.Collections.Generic
 open VersionComparer
 open UserService
+open PublicModel.PerfReportModel
 
 let private repoTmpPath = IO.Path.Combine(IO.Path.GetTempPath(), "benchmark-browser-repositories")
 
@@ -268,16 +269,22 @@ let getTestDefDashboard (uid: Guid) (pid:string) (s: IDocumentSession) = task {
     | None -> return Error ("Task definiton not found")
 }
 
+let private getCommitDetails cloneUrls commit =
+    let repo = RepoManager.getRepoStructureOfMany repoTmpPath cloneUrls
+    repo.Commits.[commit]
+
 let getReportGroups a session = task {
     match a with
     | ReportGroupSelector.Version commit ->
         let! data = getVersionData commit None session
-        return data |> Seq.map (fun v -> v.Data) |> Seq.toArray
+        let repos = data |> Seq.map (fun x -> x.Data.ProjectCloneUrl) |> Seq.distinct |> Seq.map Uri |> Seq.toArray
+        let commitDetails = getCommitDetails repos commit
+        return data, (ReportGroupDetails.Commits [|commitDetails|])
 }
 
 let compareGroups a b session = task {
-    let! vA = getReportGroups a session
-    let! vB = getReportGroups b session
-    let cmp = VersionComparer.compareVersions ComparisonOptions.Default (vA) (vB)
-    return cmp, vA, vB
+    let! vA, descriptionA = getReportGroups a session
+    let! vB, descriptionB = getReportGroups b session
+    let cmp = VersionComparer.compareVersions ComparisonOptions.Default (vA |> Seq.map (fun x -> x.Data)) (vB |> Seq.map (fun x -> x.Data))
+    return cmp, vA, vB, descriptionA, descriptionB
 }

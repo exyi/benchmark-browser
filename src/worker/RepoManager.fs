@@ -4,6 +4,7 @@ open Fake.Tools
 open System
 open PublicModel.WorkerModel
 open PublicModel.ProjectManagement
+open PublicModel.PerfReportModel
 open System.Collections.Concurrent
 open Microsoft.Extensions.Caching.Memory
 open System.Security.Claims
@@ -109,14 +110,6 @@ let getRootCommit repoPath =
 let getCloneUrl repoPath =
     Git.CommandHelper.runSimpleGitCommand repoPath "config --get remote.origin.url"
 
-type GitCommitInfo = {
-    Hash: string
-    Parents: string[]
-    Signature: string option
-    Author: string
-    Time: DateTime
-    Subject: string
-}
 
 let private computeChildMap commits =
     commits
@@ -181,7 +174,7 @@ let getRepoStructure tmpPath cloneUrl =
     hackSetSomeInternalShit()
     let repo = getUpToDate tmpPath cloneUrl (TimeSpan.FromHours 1.5)
     repoStructureCache.GetOrCreate(repo, fun _ ->
-        let success, ``commits_lines``, err = Git.CommandHelper.runGitCommand repo ("rev-list --remotes --pretty=\"format:%H|%P|%G? - %GK - %GS|%ae <%an>|%ai|%s\"")
+        let success, ``commits_lines``, err = Git.CommandHelper.runGitCommand repo ("rev-list --remotes --pretty=\"format:%H|%P|%G? - %GK - %GS|%an <%ae>|%ai|%s\"")
         if not success then failwithf "Git error: %s" err
 
         let success, ``branches_lines``, err = Git.CommandHelper.runGitCommand repo "ls-remote --heads origin"

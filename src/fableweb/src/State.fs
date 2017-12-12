@@ -10,6 +10,7 @@ open Home.Types
 open Admin.Global
 open Utils
 open PublicModel.PerfReportModel
+open Counter.Types
 
 let pageParser: Parser<Page->Page,Page> =
   oneOf [
@@ -56,7 +57,8 @@ let init result =
         loginBox = loginBox
         admin = Admin.Global.initState ()
         board = ProjectDashboard.initState
-        compare = CompareDetail.initState }
+        compare = CompareDetail.initState
+        pageOptions = PageOptions.Default }
   model, Cmd.batch [ cmd
                      Cmd.map CounterMsg counterCmd
                      Cmd.map HomeMsg homeCmd
@@ -89,3 +91,6 @@ let update msg model =
           dirtyLocalStorage.["detail-grid-layout"] <- m.GridSettings
             // Fable.Import.Browser.localStorage.setItem("detail-grid-layout", Fable.Core.JsInterop.toJson m.GridSettings)
       { model with compare = m }, Cmd.map CompareMsg cmd
+  | PageOptionsMsg msg ->
+      let (m, cmd) = msg.Invoke model.pageOptions
+      { model with pageOptions = m }, Cmd.map PageOptionsMsg cmd

@@ -28,7 +28,7 @@ with
 
     static member TryScaleBy (num: float) =
         function
-        | Time s -> TimeSpan.FromMilliseconds(s.TotalMilliseconds * num) |> Time |> Some
+        | Time s -> TimeSpan(float s.Ticks * num |> int64) |> Time |> Some
         | ByteSize s -> s * num |> ByteSize |> Some
         | Number (a, units) -> Number (a * num, units) |> Some
         | Fraction (a, frOf) -> Fraction (a * num, frOf) |> Some
@@ -123,6 +123,20 @@ with
 type ReportGroupSelector =
     | Version of string
 
+type GitCommitInfo = {
+    Hash: string
+    Parents: string[]
+    Signature: string option
+    Author: string
+    Time: DateTime
+    Subject: string
+}
+
+[<RequireQualifiedAccessAttribute>]
+type ReportGroupDetails =
+    | Commits of GitCommitInfo []
+    | NoInfo
+
 
 [<RequireQualifiedAccessAttribute>]
 type IncludeOrExcludeOption =
@@ -142,3 +156,5 @@ type ComparisonOptions = {
 }
 with
     static member Default = { ComparisonOptions.Environment = IncludeOrExcludeOption.IncludeExcept [||] }
+
+

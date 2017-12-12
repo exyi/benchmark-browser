@@ -3,7 +3,6 @@ open Fable.Helpers.React
 open Fable.Helpers.React.Props
 open Utils
 open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
 open Fable.PowerPack
 open System.Globalization
 open System
@@ -14,6 +13,7 @@ open System.Collections.Generic
 open Elmish
 open Fable.Import.React
 open Fable.Core.JsInterop
+open PublicModel.PerfReportModel
 
 let splitLastSegment (str: string) =
             let lastDot = str.LastIndexOf('.')
@@ -92,13 +92,15 @@ with
 
 type ComparisonData = {
     Comparison: VersionComparisonSummary
-    Base: WorkerSubmission []
-    Target: WorkerSubmission []
+    Base: BenchmarkReport []
+    Target: BenchmarkReport []
+    BaseDescription: ReportGroupDetails
+    TargetDescription: ReportGroupDetails
 }
 with
     static member Load (vA, vB) =
-        ApiClient.loadComparison vA vB |> Promise.map (fun (comparison, lbase, ltarget) ->
-            { Comparison = comparison; Base = lbase; Target = ltarget }
+        ApiClient.loadComparison vA vB |> Promise.map (fun (comparison, lbase, ltarget, dbase, dtarget) ->
+            { Comparison = comparison; Base = lbase; Target = ltarget; BaseDescription = dbase; TargetDescription = dtarget }
         )
 
 type Model = {
@@ -114,7 +116,7 @@ with
                 match x with
                 | LoadableData.Loaded d -> Array.append d.Target d.Base
                 | _ -> [||]
-            let settings = m.GridSettings.AddColumnsFromData (rows)
+            let settings = m.GridSettings.AddColumnsFromData (rows |> Array.map (fun x -> x.Data))
             { m with Data = x; GridSettings = settings })
     static member LiftSettingsMsg = UpdateMsg'.lift (fun x -> x.GridSettings) (fun m x -> { m with GridSettings = x })
 module SortableImport =
@@ -123,6 +125,9 @@ module SortableImport =
     let arrayMove : ('a [] -> int -> int -> 'a[])  = Fable.Core.JsInterop.import "arrayMove" "react-sortable-hoc"
 
 open SortableImport
+open PublicModel.PerfReportModel
+open System.Data.Common
+open PublicModel.PerfReportModel
 
 let initState =
     let storedSettings =
@@ -170,11 +175,11 @@ let private viewValue =
     | TestResultValue.Number (num, units) -> str (sprintf "%g%s" num (units |> Option.defaultValue ""))
     | x -> str (sprintf "%A" x)
 
-let viewResultsGrid (tuples: (WorkerSubmission * WorkerSubmission) array) (settings: GridLayoutSettings) settingsDispatch =
+let viewResultsGrid (tuples: (BenchmarkReport * BenchmarkReport) array) (settings: GridLayoutSettings) settingsDispatch =
     let rows = tuples |> Seq.map (fun (a, b) ->
         let cols = settings.Columns |> Array.map (fun c ->
-            let colA = c.Getter.Eval a
-            let colB = c.Getter.Eval b
+            let colA = c.Getter.Eval a.Data
+            let colB = c.Getter.Eval b.Data
 
             let content =
                 match (colA, colB) with
@@ -220,7 +225,7 @@ let viewResultsGrid (tuples: (WorkerSubmission * WorkerSubmission) array) (setti
 
     let headerRow (columns: GridColumnDescriptor []) =
         columns |> Seq.mapi (fun index col ->
-            th [ ClassName "th"; Title col.Legend ] [
+            th [ ClassName "th"; Title (col.Title + " - " + col.Legend); Style [ TextOverflow "ellipsis" ] ] [
                 createElement(
                     sortableHeaderItem,
                     createObj [
@@ -292,30 +297,74 @@ let viewSettingsPanel (model: GridLayoutSettings) dispatch =
                     ))
     ]
 
-let viewData (model: ComparisonData) gridSettings gridSettingsDispatch =
-    let aMap = model.Base |> Seq.map (fun x -> createMappingKey x, x) |> Map.ofSeq
-    let pairs = model.Target |> Seq.choose (fun x -> Map.tryFind (createMappingKey x) aMap |> Option.map (fun a -> a, x)) |> Seq.toArray
+let viewGroupDetails =
+    function
+    | ReportGroupDetails.Commits commits ->
+        div [ ClassName "box" ] [
+            for commit in commits do
+                yield div [ ClassName "content" ] [
+                    p [] [
+                        strong [] [ str commit.Author ]
+                        str " "
+                        commit.Signature |> Option.map (fun sign -> span [] [ str sign; faIcon "is-small has-text-success" "check" ]) |> Option.defaultValue (str "")
+                        str " "
+                        span [ Title (string commit.Time) ] [ str ((commit.Time |> box :?> string |> DateTime.Parse).ToShortDateString()) ]
+                        str " "
+                        small [] [ str commit.Hash ]
+
+                        br []
+
+                        str commit.Subject
+                    ]
+                ]
+        ]
+    | ReportGroupDetails.NoInfo -> div [] []
+
+let viewData (verA, verB) (model: ComparisonData) gridSettings gridSettingsDispatch =
+    let aMap = model.Base |> Seq.map (fun x -> createMappingKey x.Data, x) |> Map.ofSeq
+    let pairs = model.Target |> Seq.choose (fun x -> Map.tryFind (createMappingKey x.Data) aMap |> Option.map (fun a -> a, x)) |> Seq.toArray
     div [] [
+        (
+            if model.BaseDescription = model.TargetDescription then
+                viewGroupDetails model.BaseDescription
+            else
+                div [ ClassName "columns" ] [
+                    div [ ClassName "column" ] [
+                        h4 [ ClassName "subtitletitle is-4" ] [ str "Base" ]
+                        viewGroupDetails model.BaseDescription
+                    ]
+                    div [ ClassName "column" ] [
+                        h4 [ ClassName "subtitletitle is-4" ] [ str "Target" ]
+                        viewGroupDetails model.TargetDescription
+                    ]
+                ]
+        )
+
+        (if model.BaseDescription <> model.TargetDescription then
+            div [ ClassName "level" ] [
+                div [ ClassName "level-item" ] [
+                    a [ ClassName "button"; Href (Global.toHash (Global.Page.CompareDetail (verA, verA))) ] [ str "Detail" ]
+                ]
+                div [ ClassName "level-item" ] [
+                    a [ ClassName "button"; Href (Global.toHash (Global.Page.CompareDetail (verB, verA))) ] [ str "Swap" ]
+                ]
+                div [ ClassName "level-item" ] [
+                    a [ ClassName "button"; Href (Global.toHash (Global.Page.CompareDetail (verB, verB))) ] [ str "Detail" ]
+                ]
+            ]
+        else
+            str ""
+        )
+
         viewComparisonSummary model.Comparison
         viewSettingsPanel gridSettings gridSettingsDispatch
-        div [ Style [ MaxWidth "90vw"; OverflowX "scroll" ] ] [
+
+        section [ ClassName "section is-fullwidth"; Style [ MaxWidth "90vw"; OverflowX "scroll" ] ] [
             viewResultsGrid pairs gridSettings gridSettingsDispatch
         ]
     ]
 
-let view (verA, verB) model dispatch =
-    let isComparison = verA <> verB
-
-    let displayGroupSpec = function
-                           | ReportGroupSelector.Version ver -> str ("Version " + ver)
-
+let view (verA, verB) (model: Model) dispatch =
     div [] [
-        h1 [ ClassName "title" ] (
-            if isComparison then
-                [ str "Comparison of "; displayGroupSpec verA; str " and "; displayGroupSpec verB ]
-            else
-                [ str "Detail of "; displayGroupSpec verA ]
-        )
-
-        LoadableData'.display model.Data (Model.LiftDataMsg >> dispatch) (fun data _ -> viewData data model.GridSettings (Model.LiftSettingsMsg >> dispatch)) (fun _ -> ComparisonData.Load (verA, verB))
+        LoadableData'.display model.Data (Model.LiftDataMsg >> dispatch) (fun data _ -> viewData (verA, verB) data model.GridSettings (Model.LiftSettingsMsg >> dispatch)) (fun _ -> ComparisonData.Load (verA, verB))
     ]

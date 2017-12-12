@@ -15,6 +15,9 @@ open PublicModel.PerfReportModel
 open PublicModel.PerfReportModel
 open PublicModel.PerfReportModel
 open PublicModel.PerfReportModel
+open PublicModel.PerfReportModel
+open PublicModel.PerfReportModel
+open PublicModel.PerfReportModel
 
 let endpoint = "http://localhost:5000"
 
@@ -89,9 +92,9 @@ let enqueueTask (data: WorkerModel.WorkerQueueItemFormModel) : JS.Promise<Result
     execApiRequest "enqueueTask" data []
 
 
-let loadComparison (verA: ReportGroupSelector) verB : JS.Promise<VersionComparisonSummary * WorkerSubmission[] * WorkerSubmission[]> =
+let loadComparison (verA: ReportGroupSelector) verB : JS.Promise<VersionComparisonSummary * BenchmarkReport[] * BenchmarkReport[] * ReportGroupDetails * ReportGroupDetails> =
     if verA = verB then
         let data = execApiRequest "getReports" verA []
-        data |> Promise.map (fun d -> VersionComparisonSummary.IdentityCompare "" (Array.length d), d, d)
+        data |> Promise.map (fun (d, details) -> VersionComparisonSummary.IdentityCompare "" (Array.length d), d, d, details, details)
     else
         execApiRequest "compareReports" (verA, verB) []

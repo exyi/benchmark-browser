@@ -8,31 +8,42 @@ open System.Net
 open System.Text
 open PublicModel
 open PublicModel.AccountManagement
-open PublicModel.AccountManagement
-open PublicModel.WorkerModel
 open System.Net.Http
-open PublicModel.WorkerModel
-open PublicModel.WorkerModel
 open DataClasses
-open PublicModel.ProjectManagement
 open Fake
 open Fake.Core.StringBuilder
 open PublicModel.ProjectManagement
 open Fake.Core
-open PublicModel.PerfReportModel
 open Fake.IO
 open Newtonsoft.Json.Linq
-open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
-open Newtonsoft.Json.Linq
-open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
-open Newtonsoft.Json.Linq
-open PublicModel.PerfReportModel
 open System.Collections.Generic
 open Fake.Core.String
 open PublicModel.WorkerModel
 open System.Diagnostics
+open PublicModel.PerfReportModel
+
+type FableHacksJsonConverter() = class
+    inherit JsonConverter()
+
+    override x.CanRead = true
+    override x.CanWrite = true
+    override x.CanConvert(t: Type) =
+        t = typeof<TimeSpan>;
+
+    override x.WriteJson(writer: JsonWriter, value: obj, serializer: JsonSerializer) =
+        let number : TimeSpan = unbox value
+        writer.WriteValue(number.TotalMilliseconds)
+        ()
+
+    override x.ReadJson(reader: JsonReader, t: Type, existingValue: obj, serializer: JsonSerializer) =
+        let time = JValue.ReadFrom(reader).Value<float>()
+        time * float TimeSpan.TicksPerMillisecond |> int64 |> TimeSpan |> box
+end
+
+let converters = [|
+        FableHacksJsonConverter() :> JsonConverter
+        Fable.JsonConverter() :> JsonConverter
+    |]
 
 let getConfig (args: string array) =
     let file = args.[0]
@@ -67,12 +78,13 @@ let sendJsonRequest config auth url data =
         if box data :? IO.Stream then
             new StreamContent(box data :?> IO.Stream) :> HttpContent
         else
-            let json = Newtonsoft.Json.JsonConvert.SerializeObject(data, Fable.JsonConverter())
+            let json = Newtonsoft.Json.JsonConvert.SerializeObject(data, converters)
+            printfn "Sending %s <- %s" url json
             new StringContent(json, Encoding.UTF8) :> HttpContent
 
     let result = sendRequest config url auth (Some content)
     result |> Result.map (fun rjson ->
-        Newtonsoft.Json.JsonConvert.DeserializeObject(rjson, Fable.JsonConverter())
+        Newtonsoft.Json.JsonConvert.DeserializeObject(rjson, converters)
     )
 
 let login config : (UserDetails * string) =
@@ -195,7 +207,7 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
             let path = getPath f
             if not <| path.StartsWith("Columns.") && f.Value :? JValue then
                 if f.Value.Type <> JTokenType.String && path.Contains "Statistics." && not <| (path.EndsWith ".N" || path.EndsWith ".Kurtosis" || path.EndsWith ".Skewness") then
-                    results.Add (path, (f.Value.Value<float>() / 1000000.0) |> TimeSpan.FromMilliseconds |> TestResultValue.Time)
+                    results.Add (path, (f.Value.Value<float>() / 100.0) |> int64 |> TimeSpan |> TestResultValue.Time)
                 else if f.Value.Type = JTokenType.String then
                     results.Add (path, TestResultValue.Anything <| f.Value.Value<string>())
                 else if f.Value.Type = JTokenType.Boolean then
@@ -231,7 +243,7 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
                         results.Add("Columns." + propName, TestResultValue.Anything <| v.Value<string>())
                 | "TimeUnit" ->
                     let micros = v.Value<string>() |> Double.Parse
-                    results.Add("Columns." + propName, TestResultValue.Time <| TimeSpan.FromMilliseconds(micros / 1000.0))
+                    results.Add("Columns." + propName, TestResultValue.Time <| TimeSpan(micros * 10.0 |> int64))
                 | "SizeUnit" ->
                     let bytes = v.Value<string>() |> Double.Parse
                     results.Add("Columns." + propName, TestResultValue.ByteSize bytes)
