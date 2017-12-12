@@ -9,6 +9,7 @@ open Giraffe.HttpHandlers
 open Giraffe.Middleware
 open Giraffe.Tasks
 open Giraffe.HttpContextExtensions
+open Fake.Tools.Git.Repository
 
 let pushResults (context: HttpContext) data =
     let userGuid = Authentication.getCurrentUserId context
@@ -39,9 +40,31 @@ let compareReportGroups ctx (a, b) =
 let getFiles (archiveType: string) (next : HttpFunc) (ctx : HttpContext) =
     let mimeType = Map.find archiveType FileStorage.archiveTypes
     ctx.Response.ContentType <- mimeType
-    let files = ctx.Request.Query |> Seq.map (fun (KeyValue (name, file)) -> name, (file.ToArray() |> Array.map Guid.Parse))
+    printfn "%A" ctx.Request.Query
+    let files =
+        ctx.Request.Query
+        |> Seq.map (fun (KeyValue (name, file)) ->
+            let name, values =
+                if file.Count = 0 then "", [|name|]
+                else name, file.ToArray()
+
+            name, (values |> Array.choose (fun x ->
+                match Guid.TryParse x with
+                | (true, guid) -> Some guid
+                | _ -> None))
+        )
+        |> Seq.filter (fun (_, a) -> a.Length > 0)
+    let parameters =
+        ctx.Request.Query
+        |> Seq.choose (fun (KeyValue (name, v)) ->
+            if name.StartsWith "q_" then
+                Some (name.Substring(2), v.ToArray())
+            else
+                None
+        )
+        |> Map.ofSeq
     let stream = ctx.Response.Body
     task {
-        do! DatabaseOperation.execOperation ctx (FileStorage.dumpFiles archiveType files stream)
+        do! DatabaseOperation.execOperation ctx (FileStorage.dumpFiles archiveType (parameters) files stream)
         return Some ctx
     }

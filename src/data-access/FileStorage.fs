@@ -9,6 +9,8 @@ open System.Xml.Linq
 open System.Diagnostics
 open System.Collections.Concurrent
 open System.Runtime.InteropServices.ComTypes
+open Giraffe.HttpHandlers
+open Fake.Tools.Git.Rebase
 
 [<RequireQualifiedAccessAttribute>]
 /// Represents special type of stored file
@@ -65,8 +67,27 @@ let mergeStacks (stacks : (string * int)[] seq) : seq<string * int> =
         m |> Seq.map (fun (x, c) -> x, (float c / total)))
     counts |> Seq.concat |> Seq.groupBy (fst) |> Seq.map (fun (stack, cnt) -> stack, (Seq.sumBy snd (cnt) * totalTotal |> int))
 
-let getFlameGraph (stacks: (string * int) seq) outStream = task {
-    let startInfo = System.Diagnostics.ProcessStartInfo("../../FlameGraph/flamegraph.pl", "--hash --cp")
+
+let digInMethods target stacks =
+    stacks |> Seq.choose (fun (stack: string, count) ->
+        let frames = stack.Split(';')
+        frames |> Array.tryFindIndex (fun f -> Seq.exists f.Contains target)
+            |> Option.map (fun firstFrame ->
+                (String.Join(";", frames |> Seq.skip firstFrame), count))
+    )
+
+let getFlameGraph (args: Map<string, string[]>) (stacks: (string * int) seq) outStream = task {
+
+    let stacks =
+        match args.TryFind "dig" with
+        | Some target -> digInMethods target stacks
+        | None -> stacks
+
+    let title = args.TryFind "title" |> Option.bind (Seq.tryHead) |> Option.defaultValue "Flame graph"
+    let colors = args.TryFind "colors" |> Option.bind (Seq.tryHead) |> Option.defaultValue "hot"
+    let width = args.TryFind "width" |> Option.bind (Seq.tryHead) |> Option.defaultValue "1200"
+
+    let startInfo = System.Diagnostics.ProcessStartInfo("../../FlameGraph/flamegraph.pl", sprintf "--hash --title \"%s\" --colors \"%s\" --width \"%s\"" title colors width)
     startInfo.RedirectStandardInput <- true
     startInfo.RedirectStandardOutput <- true
     let process = Diagnostics.Process.Start startInfo
@@ -77,9 +98,9 @@ let getFlameGraph (stacks: (string * int) seq) outStream = task {
     process.WaitForExit(20*1000)
 }
 
-let archivers : Map<string, (((unit -> Task<IO.Stream>) * string) seq -> IO.Stream -> Task<unit>)> =
+let archivers : Map<string, (Map<string, string[]> -> ((unit -> Task<IO.Stream>) * string) seq -> IO.Stream -> Task<unit>)> =
     Map.ofList [
-        "zip", (fun files output -> task {
+        "zip", (fun _args files output -> task {
             use zip = new IO.Compression.ZipArchive(output, IO.Compression.ZipArchiveMode.Create, true)
             for file, name in files do
                 use! fileStream = file()
@@ -88,13 +109,13 @@ let archivers : Map<string, (((unit -> Task<IO.Stream>) * string) seq -> IO.Stre
                 do! fileStream.CopyToAsync(entryStream)
             return ()
         })
-        "flame", (fun files output -> task {
+        "flame", (fun args files output -> task {
             let stacks = ResizeArray()
             for file, _name in files do
                 use! fileStream = file()
                 stacks.Add( parseStacks fileStream)
             let allStacks = mergeStacks stacks
-            do! getFlameGraph allStacks output
+            do! getFlameGraph args allStacks output
         })
     ]
 
@@ -138,9 +159,9 @@ let openFileStream (fid:Guid) (s: IDocumentSession) = task {
            | FileArchiveInfo.GZipped -> new IO.Compression.GZipStream(file, IO.Compression.CompressionMode.Decompress) :> IO.Stream
 }
 
-let dumpFiles archiver (files: (string * Guid[]) seq) (outStream: IO.Stream) dbSession =
+let dumpFiles archiver parameters (files: (string * Guid[]) seq) (outStream: IO.Stream) dbSession =
     let archiver = Map.find archiver archivers
-    archiver (files |> Seq.collect (fun (name, files) -> seq {
+    archiver parameters (files |> Seq.collect (fun (name, files) -> seq {
         for f in files do
             let name =
                 if files.Length = 1 then name
