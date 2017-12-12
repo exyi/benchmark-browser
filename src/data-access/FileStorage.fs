@@ -2,6 +2,13 @@ module DataAccess.FileStorage
 open System
 open Marten
 open Giraffe.Tasks
+open System.Threading.Tasks
+open Giraffe.Tasks
+open Marten
+open System.Xml.Linq
+open System.Diagnostics
+open System.Collections.Concurrent
+open System.Runtime.InteropServices.ComTypes
 
 [<RequireQualifiedAccessAttribute>]
 /// Represents special type of stored file
@@ -30,6 +37,66 @@ type StoredFileInfo = {
     /// Any classification, may help deduplication or file classification
     Tags: string []
 }
+
+let archiveTypes =
+    Map.ofList [
+        "zip", "application/zip"
+        "flame", "image/svg+xml"
+    ]
+
+let parseStacks (file: IO.Stream) =
+    use reader = new IO.StreamReader(file)
+    Seq.unfold (fun (reader: IO.StreamReader) ->
+        let line = reader.ReadLine()
+        if isNull line then
+            None
+        else
+            let lastSpace = line.LastIndexOf ' '
+            let name = line.Remove lastSpace
+            let count = line.Substring lastSpace |> Int32.Parse
+            Some ((name, count), reader)
+    ) reader |> Seq.toArray
+
+let mergeStacks (stacks : (string * int)[] seq) : seq<string * int> =
+    let mutable totalTotal = 0.0;
+    let counts = stacks |> Seq.map (fun m ->
+        let total = Array.sumBy snd m |> float
+        totalTotal <- totalTotal + total
+        m |> Seq.map (fun (x, c) -> x, (float c / total)))
+    counts |> Seq.concat |> Seq.groupBy (fst) |> Seq.map (fun (stack, cnt) -> stack, (Seq.sumBy snd (cnt) * totalTotal |> int))
+
+let getFlameGraph (stacks: (string * int) seq) outStream = task {
+    let startInfo = System.Diagnostics.ProcessStartInfo("../../FlameGraph/flamegraph.pl", "--hash --cp")
+    startInfo.RedirectStandardInput <- true
+    startInfo.RedirectStandardOutput <- true
+    let process = Diagnostics.Process.Start startInfo
+    for (s, count) in stacks do
+        process.StandardInput.WriteLine(sprintf "%s %d" s count)
+    process.StandardInput.Close()
+    do! process.StandardOutput.BaseStream.CopyToAsync outStream
+    process.WaitForExit(20*1000)
+}
+
+let archivers : Map<string, (((unit -> Task<IO.Stream>) * string) seq -> IO.Stream -> Task<unit>)> =
+    Map.ofList [
+        "zip", (fun files output -> task {
+            use zip = new IO.Compression.ZipArchive(output, IO.Compression.ZipArchiveMode.Create, true)
+            for file, name in files do
+                use! fileStream = file()
+                let entry = zip.CreateEntry(name, IO.Compression.CompressionLevel.Optimal)
+                use entryStream = entry.Open()
+                do! fileStream.CopyToAsync(entryStream)
+            return ()
+        })
+        "flame", (fun files output -> task {
+            let stacks = ResizeArray()
+            for file, _name in files do
+                use! fileStream = file()
+                stacks.Add( parseStacks fileStream)
+            let allStacks = mergeStacks stacks
+            do! getFlameGraph allStacks output
+        })
+    ]
 
 let fileStoragePath = "./blobStorage"
 
@@ -62,3 +129,21 @@ let storeFile fileId t tags (stream: IO.Stream) (s: IDocumentSession) = task {
     s.Insert entity
     return entity
 }
+
+let openFileStream (fid:Guid) (s: IDocumentSession) = task {
+    let! entity = s.LoadAsync<StoredFileInfo> fid
+    let file = IO.File.OpenRead (entity.FilePath) :> IO.Stream
+    return match entity.ArchiveInfo with
+           | FileArchiveInfo.Plain -> file
+           | FileArchiveInfo.GZipped -> new IO.Compression.GZipStream(file, IO.Compression.CompressionMode.Decompress) :> IO.Stream
+}
+
+let dumpFiles archiver (files: (string * Guid[]) seq) (outStream: IO.Stream) dbSession =
+    let archiver = Map.find archiver archivers
+    archiver (files |> Seq.collect (fun (name, files) -> seq {
+        for f in files do
+            let name =
+                if files.Length = 1 then name
+                else name + (string f)
+            yield (fun () -> openFileStream f dbSession), name
+    })) outStream

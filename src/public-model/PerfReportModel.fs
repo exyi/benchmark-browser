@@ -15,7 +15,8 @@ type TestResultValue =
     /// Fraction of something, with optional specifier of the target. The 54% of execution time should be represented as (0.54, Some "AvgTime")
     | Fraction of (float * string option)
     | Anything of string
-    | AttachedFile of Guid * string
+    /// File id and optional tags
+    | AttachedFile of Guid * string[]
 
 with
     static member GetComparable =

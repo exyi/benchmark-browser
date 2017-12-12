@@ -172,17 +172,37 @@ type BenchmarkDotNetLogExtraction = {
 }
 
 type BenchmarkData = {
-    Attachements: (string * Guid) array
+    Attachements: (string * Guid * string[]) array
     ResultLegend: Map<string, string>
     // LocalAttachements: Map<string, string>
     Data: WorkerSubmission []
 }
 
+let getFileTags (file: string) =
+    let specialType =
+        if file.EndsWith(".stacks") || file.EndsWith(".stacks.gz") then "_stacks"
+        else ""
+
+    printf "Uploading file%s %s: " specialType file
+
+    let tags =
+        [|
+            (if file.EndsWith(".json") then Some "json" else None)
+            (if file.EndsWith(".json") then Some "json" else None)
+            (if file.EndsWith(".xml") then Some "xml" else None)
+            // (if file.EndsWith("-report.json") && file.Contains "BenchmarkDotNet.Artifacts" then Some "BDN_json" else None)
+            (if file.EndsWith(".log") then Some "log" else None)
+            (if file.EndsWith(".html") then Some "html" else None)
+            (if file.EndsWith(".csv") then Some "csv" else None)
+            (if specialType <> "" then Some <| specialType.TrimStart('_') else None)
+        |] |> Array.choose id
+    tags
+
 let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
     let globalJson = JObject.Parse(IO.File.ReadAllText(filePath))
 
 
-    let files = ResizeArray<(string * Guid)>()
+    let files = ResizeArray<(string * Guid * string[])>()
     let parseTestResult (json:JObject) =
         let results = ResizeArray<(string * TestResultValue)>()
         let environment = ResizeArray<(string * string)>()
@@ -237,8 +257,10 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
                         results.Add("Columns." + propName, TestResultValue.Number (v.Value<string>() |> Double.Parse, None))
                     else if legend.["IsFileName"].Value<bool>() then
                         let fileGuid = Guid.NewGuid()
-                        files.Add (v.Value<string>(), fileGuid)
-                        results.Add("Columns." + propName, TestResultValue.AttachedFile (fileGuid, ""))
+                        let fileName = v.Value<string>()
+                        let tags = getFileTags fileName
+                        files.Add (fileName, fileGuid, tags)
+                        results.Add("Columns." + propName, TestResultValue.AttachedFile (fileGuid, tags))
                     else
                         results.Add("Columns." + propName, TestResultValue.Anything <| v.Value<string>())
                 | "TimeUnit" ->
@@ -270,7 +292,7 @@ let benchmarkDotNet_processStuff emptyReport (extract: BenchmarkDotNetLogExtract
     let jsonFile = extract.OutFiles |> Seq.tryFind (fun f -> f.EndsWith ".json")
     let result = jsonFile |> Option.map (benchmarkDotNet_parseJson emptyReport) |> Option.defaultValue { BenchmarkData.Data = [||]; Attachements = [||]; ResultLegend = Map.empty }
 
-    { result with Attachements = Array.concat [ result.Attachements; extract.OutFiles |> Seq.map (fun f -> f, Guid.NewGuid()) |> Seq.toArray ] }
+    { result with Attachements = Array.concat [ result.Attachements; extract.OutFiles |> Seq.map (fun f -> f, Guid.NewGuid(), (Array.append (getFileTags f) [| "global"; "BdnReport" |])) |> Seq.toArray ] }
 
 let benchmarkDotNet_logparser applicationWD =
     let extract = { BenchmarkDotNetLogExtraction.OutFiles = ResizeArray() }
@@ -334,35 +356,24 @@ let executeWork (config:WorkerConfig) (spec:TaskSpecification) =
     printfn "%s" repo
     let results, logFile = executeTest repo spec.DefinitionId spec.Definition
     printfn "Logfile is at %s" logFile
-    { results with Attachements = Array.append results.Attachements [| logFile, Guid.NewGuid() |] }
+    { results with Attachements = Array.append results.Attachements [| logFile, Guid.NewGuid(), [| "global"; "log" |] |] }
 
 let sendResponse (api: IServerFunction) ({ BenchmarkData.Attachements = attachements; Data = results; ResultLegend = _legend}) : PerfReportModel.ImportResult array =
     let results = api.Invoke "pushResults" results |> expectOk |> Seq.toArray
 
-    for (file, fileId) in attachements do
+    for (file, fileId, tags) in attachements do
         try
             use stream = IO.File.OpenRead file
-            let specialType =
-                if file.EndsWith(".stacks") || file.EndsWith(".stacks.gz") then "_stacks"
-                else ""
 
-            printf "Uploading file%s %s: " specialType file
+            let specialType =
+                if Array.contains "stacks" tags then "_stacks"
+                else ""
 
             use stream = if (String.IsNullOrEmpty specialType |> not) && file.EndsWith(".gz") then
                             new IO.Compression.GZipStream(stream, IO.Compression.CompressionMode.Decompress) :> IO.Stream
                          else stream :> IO.Stream
 
-            let tags =
-                [|
-                    (if file.EndsWith(".json") then Some "json" else None)
-                    (if file.EndsWith(".json") then Some "json" else None)
-                    (if file.EndsWith(".xml") then Some "xml" else None)
-                    // (if file.EndsWith("-report.json") && file.Contains "BenchmarkDotNet.Artifacts" then Some "BDN_json" else None)
-                    (if IO.Path.GetFileNameWithoutExtension(file).Split('-') |> Array.contains("report") && file.Contains "BenchmarkDotNet.Artifacts" then Some "BdnReport" else None)
-                    (if file.EndsWith(".log") then Some "log" else None)
-                    (if file.EndsWith(".html") then Some "html" else None)
-                    (if file.EndsWith(".csv") then Some "csv" else None)
-                |] |> Array.choose id
+            printf "Uploading file%s %s: " specialType file
 
             let tagsQS = tags |> Seq.map Uri.EscapeDataString |> Seq.map ((+) "tag=") |> (fun x -> String.Join('&', x))
 

@@ -90,6 +90,10 @@ with
 
         { x with Columns = Array.append x.Columns newCols }
 
+let private cmpOptions = ComparisonOptions.Default
+let private createMappingKey (s: WorkerSubmission) =
+    s.TaskName, s.Environment |> cmpOptions.Environment.FilterMap, s.TaskParameters
+
 type ComparisonData = {
     Comparison: VersionComparisonSummary
     Base: BenchmarkReport []
@@ -102,6 +106,11 @@ with
         ApiClient.loadComparison vA vB |> Promise.map (fun (comparison, lbase, ltarget, dbase, dtarget) ->
             { Comparison = comparison; Base = lbase; Target = ltarget; BaseDescription = dbase; TargetDescription = dtarget }
         )
+    member model.GetPairs () =
+        let aMap = model.Base |> Seq.map (fun x -> createMappingKey x.Data, x) |> Map.ofSeq
+        let pairs = model.Target |> Seq.choose (fun x -> Map.tryFind (createMappingKey x.Data) aMap |> Option.map (fun a -> a, x)) |> Seq.toArray
+        pairs
+
 
 type Model = {
     Data: LoadableData<ComparisonData>
@@ -128,6 +137,7 @@ open SortableImport
 open PublicModel.PerfReportModel
 open System.Data.Common
 open PublicModel.PerfReportModel
+open System.Data
 
 let initState =
     let storedSettings =
@@ -164,16 +174,69 @@ let viewComparisonSummary (model: VersionComparisonSummary) =
             )
         ]
 
-let private cmpOptions = ComparisonOptions.Default
-
-let private createMappingKey (s: WorkerSubmission) =
-    s.TaskName, s.Environment |> cmpOptions.Environment.FilterMap, s.TaskParameters
-
 let private viewValue =
     function
     | TestResultValue.Anything a -> str a
     | TestResultValue.Number (num, units) -> str (sprintf "%g%s" num (units |> Option.defaultValue ""))
     | x -> str (sprintf "%A" x)
+
+let viewFileColumns isCompare (tuples: (BenchmarkReport * BenchmarkReport) array) =
+    let getColumns =
+        Seq.collect (fun x -> x.Data.Results |> Map.toSeq)
+        >> Seq.filter (fun (_, v) -> match v with TestResultValue.AttachedFile _ -> true | _ -> false)
+        >> Seq.groupBy fst
+        >> Map.ofSeq
+        >> Map.map (fun _k v -> v |> Seq.collect (fun (_, TestResultValue.AttachedFile (_file, tags)) -> tags) |> Seq.distinct)
+
+    let aTags =
+        tuples |> Seq.map fst |> getColumns
+    let bTags = if isCompare then tuples |> Seq.map snd |> getColumns else Map.empty
+
+
+    let columns = Seq.append (Map.toSeq aTags) (Map.toSeq bTags) |> Seq.map fst |> Seq.distinct
+
+    let getRows (rows: BenchmarkReport seq) tagFilter column =
+        rows
+        |> Seq.choose (fun row ->
+            match row.Data.Results.TryFind column with
+            | Some (TestResultValue.AttachedFile (fileId, tags))
+                when Array.except tags tagFilter |> Array.isEmpty ->
+                    let bName = row.Data.TaskName
+                    Some (bName, fileId)
+            | _ -> None)
+    let fileButton rows tagFilter column getUrl content =
+        let rows = getRows rows tagFilter column |> Seq.toArray
+        a [
+            classList [
+                "button", true
+            ]
+            Target "_blank"
+            Disabled (Array.isEmpty rows)
+            Title (sprintf "Aggregated %d files" rows.Length)
+            Href (getUrl rows) ]
+            content
+
+    let hasTag tag col map =
+        Map.tryFind col map
+        |> Option.map (Seq.contains tag)
+        |> Option.defaultValue false
+
+    div [] [
+        for col in columns do
+            yield h3 [] [ strong [] [ str col ] ]
+            if hasTag "stacks" col aTags then
+                yield fileButton (Seq.map fst tuples) [| "stacks" |] col (ApiClient.getFlameGraphLocation << Seq.map snd) [ Utils.faIcon "is-small" "fire"; span [] [ str " Base Flamegraph" ] ]
+            if hasTag "stacks" col bTags then
+                yield fileButton (Seq.map snd tuples) [| "stacks" |] col (ApiClient.getFlameGraphLocation << Seq.map snd) [ Utils.faIcon "is-small" "fire"; span [] [ str " Target Flamegraph" ] ]
+            yield fileButton (Seq.map fst tuples) [||] col (ApiClient.getFileArchiveLocation) [
+                Utils.faIcon "is-small" "archive"; span [] [ str " Base Archive" ]
+            ]
+            yield fileButton (Seq.map snd tuples) [||] col (ApiClient.getFileArchiveLocation) [
+                Utils.faIcon "is-small" "archive"; span [] [ str " Target Archive" ]
+            ]
+    ]
+
+
 
 let viewResultsGrid (tuples: (BenchmarkReport * BenchmarkReport) array) (settings: GridLayoutSettings) settingsDispatch =
     let rows = tuples |> Seq.map (fun (a, b) ->
@@ -255,7 +318,7 @@ let viewResultsGrid (tuples: (BenchmarkReport * BenchmarkReport) array) (setting
         tbody [ ClassName "tbody" ] (Seq.toList rows)
     ]
 
-let viewSettingsPanel (model: GridLayoutSettings) dispatch =
+let viewSettingsPanel (data: ComparisonData) (model: GridLayoutSettings) dispatch =
     let addColumn col _ =
         dispatch (UpdateMsg (fun m ->
             let cols = m.InactiveColumns |> Array.except [ col ]
@@ -295,6 +358,10 @@ let viewSettingsPanel (model: GridLayoutSettings) dispatch =
                                 button [ ClassName "button is-small"; OnClick (removeColumns filter) ] [ str name ])
                                 |> Seq.toList
                     ))
+
+        Utils.dropDownMenu
+            (button [ ClassName "button" ] [ str "Attached files"; Utils.littleDropDownIcon ])
+            (lazy ([viewFileColumns (data.BaseDescription <> data.TargetDescription) (data.GetPairs())]))
     ]
 
 let viewGroupDetails =
@@ -321,8 +388,7 @@ let viewGroupDetails =
     | ReportGroupDetails.NoInfo -> div [] []
 
 let viewData (verA, verB) (model: ComparisonData) gridSettings gridSettingsDispatch =
-    let aMap = model.Base |> Seq.map (fun x -> createMappingKey x.Data, x) |> Map.ofSeq
-    let pairs = model.Target |> Seq.choose (fun x -> Map.tryFind (createMappingKey x.Data) aMap |> Option.map (fun a -> a, x)) |> Seq.toArray
+    let pairs = model.GetPairs()
     div [] [
         (
             if model.BaseDescription = model.TargetDescription then
@@ -357,7 +423,7 @@ let viewData (verA, verB) (model: ComparisonData) gridSettings gridSettingsDispa
         )
 
         viewComparisonSummary model.Comparison
-        viewSettingsPanel gridSettings gridSettingsDispatch
+        viewSettingsPanel model gridSettings gridSettingsDispatch
 
         section [ ClassName "section is-fullwidth"; Style [ MaxWidth "90vw"; OverflowX "scroll" ] ] [
             viewResultsGrid pairs gridSettings gridSettingsDispatch

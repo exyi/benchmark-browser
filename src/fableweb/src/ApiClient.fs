@@ -11,14 +11,6 @@ open System
 open Fable.Helpers.React
 open PublicModel
 open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
-open PublicModel.PerfReportModel
-
 let endpoint = "http://localhost:5000"
 
 let removeStoredTokens () =
@@ -98,3 +90,10 @@ let loadComparison (verA: ReportGroupSelector) verB : JS.Promise<VersionComparis
         data |> Promise.map (fun (d, details) -> VersionComparisonSummary.IdentityCompare "" (Array.length d), d, d, details, details)
     else
         execApiRequest "compareReports" (verA, verB) []
+
+
+let getFileArchiveLocation (fileIds: (string * Guid) seq) =
+    sprintf "%s/files/zip?%s" endpoint (String.Join("&", fileIds |> Seq.map (fun (name, guid) -> (Uri.EscapeUriString name) + "=" + string guid)))
+
+let getFlameGraphLocation (fileIds: Guid seq) =
+    sprintf "%s/files/flame?%s" endpoint (String.Join("&", fileIds |> Seq.map string |> Seq.map ((+) "n=")))

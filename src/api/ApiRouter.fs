@@ -80,6 +80,7 @@ let webApp : HttpHandler =
         routeCi "/enqueueTask" >=> requireAuth ["Admin"] >=> serveFunction (WorkerHub.enqueueWorkerTask)
         routeCif "/pushFile/%s" (fun id -> requireAuth ["Worker"] >=> serveGetFunction (WorkerHub.pushFile StoredFileType.AnyAttachement id))
         routeCif "/pushFile_stacks/%s" (fun id -> requireAuth ["Worker"] >=> serveGetFunction (WorkerHub.pushFile StoredFileType.CollectedStacks_Text id))
+        routeCif "/files/%s" TestReports.getFiles
 
         subRouteCi "/admin"
             (requireAuth ["Admin"; "Valid"] >=> choose

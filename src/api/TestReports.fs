@@ -5,6 +5,10 @@ open Microsoft.AspNetCore.Http
 open PublicModel
 open DataAccess
 open Authentication
+open Giraffe.HttpHandlers
+open Giraffe.Middleware
+open Giraffe.Tasks
+open Giraffe.HttpContextExtensions
 
 let pushResults (context: HttpContext) data =
     let userGuid = Authentication.getCurrentUserId context
@@ -30,3 +34,14 @@ let getReportGroup ctx data =
 
 let compareReportGroups ctx (a, b) =
     DatabaseOperation.execOperation ctx (PerfReportService.compareGroups a b)
+
+
+let getFiles (archiveType: string) (next : HttpFunc) (ctx : HttpContext) =
+    let mimeType = Map.find archiveType FileStorage.archiveTypes
+    ctx.Response.ContentType <- mimeType
+    let files = ctx.Request.Query |> Seq.map (fun (KeyValue (name, file)) -> name, (file.ToArray() |> Array.map Guid.Parse))
+    let stream = ctx.Response.Body
+    task {
+        do! DatabaseOperation.execOperation ctx (FileStorage.dumpFiles archiveType files stream)
+        return Some ctx
+    }
