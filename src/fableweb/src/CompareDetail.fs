@@ -59,8 +59,19 @@ type GridColumnDescriptor = {
 type GridSortType =
     | Ascending
     | Descending
+    | AscendingString
+    | DescendingString
     | AscendingDifference
     | DescendingDifference
+with
+    member x.SwapDirection () =
+        match x with
+        | Ascending -> Descending
+        | Descending -> Ascending
+        | AscendingString -> DescendingString
+        | DescendingString -> AscendingString
+        | AscendingDifference -> DescendingDifference
+        | DescendingDifference -> AscendingDifference
 
 
 [<RequireQualifiedAccessAttribute>]
@@ -112,18 +123,6 @@ with
 
         { x with Columns = Array.append x.Columns newCols }
 
-    member x.PreprocessRows getKey (data: 'a []) =
-        data
-        |> Array.filter (fun row ->
-            let row = getKey row
-            x.Filters |> Seq.forall (fun (col, filter) -> col.Getter.Eval row |> Option.map filter.Predicate |> Option.defaultValue false)
-        )
-        // |> Array.sortBy (fun row ->
-        //     x.SortOptions |> Option.map (
-        //         let row = getKey row
-        //     )
-        // )
-
 let private cmpOptions = ComparisonOptions.Default
 let private createMappingKey (s: WorkerSubmission) =
     s.TaskName, s.Environment |> cmpOptions.Environment.FilterMap, s.TaskParameters
@@ -140,10 +139,30 @@ with
         ApiClient.loadComparison vA vB |> Promise.map (fun (comparison, lbase, ltarget, dbase, dtarget) ->
             { Comparison = comparison; Base = lbase; Target = ltarget; BaseDescription = dbase; TargetDescription = dtarget }
         )
-    member model.GetPairs () =
+    member model.GetPairs settings =
         let aMap = model.Base |> Seq.map (fun x -> createMappingKey x.Data, x) |> Map.ofSeq
         let pairs = model.Target |> Seq.choose (fun x -> Map.tryFind (createMappingKey x.Data) aMap |> Option.map (fun a -> a, x)) |> Seq.toArray
         pairs
+        |> Array.filter (fun (row, _) ->
+            settings.Filters |> Seq.forall (fun (col, filter) -> col.Getter.Eval row.Data |> Option.map filter.Predicate |> Option.defaultValue false)
+        )
+        |> (
+            settings.SortOptions |> Option.map (fun (column, sortSettings) ->
+                let getKey (rowA: TestResultValue) (rowB: TestResultValue) =
+                    match sortSettings with
+                    | GridSortType.Ascending | GridSortType.Descending -> TestResultValue.GetComparable rowA |> Option.defaultValue 0.0 :> IComparable
+                    | GridSortType.AscendingString | GridSortType.DescendingString -> sprintf "%A" rowA :> IComparable
+                    | GridSortType.AscendingDifference | GridSortType.DescendingDifference ->
+                        Option.map2 (/) (TestResultValue.GetComparable rowA) (TestResultValue.GetComparable rowB) |> Option.defaultValue 0.0 :> IComparable
+
+                let sortFn =
+                    match sortSettings with
+                    | GridSortType.Ascending | GridSortType.AscendingDifference | GridSortType.AscendingString -> Array.sortBy
+                    | _ -> Array.sortByDescending
+
+                sortFn (fun (rA, rB) -> Option.map2 getKey (column.Getter.Eval rA.Data) (column.Getter.Eval rB.Data))
+            ) |> Option.defaultValue id
+        )
 
 
 type Model = {
@@ -322,7 +341,6 @@ let private setSettingsFilter settingsDispatch column replaceFilter value =
         { m with Filters = newFilters }, Cmd.none
     ))
 
-
 let viewResultsGrid (tuples: (BenchmarkReport * BenchmarkReport) array) (settings: GridLayoutSettings) settingsDispatch =
     let rows = tuples |> Seq.map (fun (a, b) ->
         let cols = settings.Columns |> Array.map (fun c ->
@@ -361,6 +379,13 @@ let viewResultsGrid (tuples: (BenchmarkReport * BenchmarkReport) array) (setting
             { m with Columns = cols }, Cmd.none))
 
     let headerMenu (column: GridColumnDescriptor) =
+        let canCompare a = column.Getter.Eval a.Data |> Option.bind TestResultValue.GetComparable |> Option.isSome
+        let allowDiffSort =
+            tuples |> Seq.exists (fun (a, b) -> canCompare a && canCompare b)
+        let allowNumSort =
+            tuples |> Seq.exists (fun (a, b) -> canCompare a || canCompare b)
+        let allowAnySort =
+            (tuples |> Seq.map fst |> Seq.distinct |> Seq.length) > 1
         let realFilters = settings.Filters |> Array.filter (fun (col, filter) -> col = column)
         let filterableItems =
             tuples
@@ -372,10 +397,32 @@ let viewResultsGrid (tuples: (BenchmarkReport * BenchmarkReport) array) (setting
             //     if filterableItems.Length then
             //         yield GridFilterDescriptor.Equals([||], [|  |])
             // |]
+        let viewSortButtons sortUp sortDown =
+            let setSortClick stype (ev: MouseEvent) =
+                ev.preventDefault()
+                closeDropdown()
+                settingsDispatch(UpdateMsg (fun m ->
+                    { m with SortOptions = Some (column, stype) }, Cmd.none
+                ))
+            span [ ClassName "buttons has-addons" ] [
+                button [ ClassName "button is-small is-rounded is-primary"; OnClick (setSortClick sortDown) ] [ faIcon "" "angle-down" ]
+                button [ ClassName "button is-small is-rounded is-primary"; OnClick (setSortClick sortUp) ] [ faIcon "" "angle-up" ]
+            ]
         let setFilter = setSettingsFilter settingsDispatch column
         [
             yield p [] [ str column.Legend ]
             yield button [ ClassName "button"; OnClick (fun ev -> removeColumn column; ev.preventDefault()) ] [ str "Remove" ]
+
+            // sort options
+            if allowDiffSort then
+                yield p [] [ str "Sort by difference: "; viewSortButtons GridSortType.AscendingDifference GridSortType.DescendingDifference ]
+            if allowAnySort then
+                if allowNumSort then
+                    yield p [] [ str "Sort by value: "; viewSortButtons GridSortType.Ascending GridSortType.Descending ]
+                else
+                    yield p [] [ str "Sort by string: "; viewSortButtons GridSortType.AscendingString GridSortType.DescendingString ]
+
+            // filter options
             if realFilters.Length >= 1 then
                 yield p [] [ str "Filter:" ]
                 for (_, filter) in realFilters do
@@ -467,12 +514,36 @@ let viewSettingsPanel (data: ComparisonData) (model: GridLayoutSettings) dispatc
 
         yield Utils.dropDownMenu
             (button [ ClassName "button" ] [ str "Attached files"; Utils.littleDropDownIcon ])
-            (lazy ([viewFileColumns (data.BaseDescription <> data.TargetDescription) (data.GetPairs() |> model.PreprocessRows (fun (a, _) -> a.Data))]))
+            (lazy ([viewFileColumns (data.BaseDescription <> data.TargetDescription) (data.GetPairs model)]))
 
         for (column, filter) in model.Filters do
             yield Utils.dropDownMenu
                 (button [ ClassName "button is-link" ] [ str ("Filter " + column.Title); Utils.littleDropDownIcon ])
                 (lazy (List.ofSeq <| viewFilterEditor true filter (setSettingsFilter dispatch column filter)))
+
+        match model.SortOptions with
+        | None -> ()
+        | Some (col, sort) ->
+            let swapSortDirection (ev: MouseEvent) =
+                dispatch (UpdateMsg (fun m ->
+                    { m with SortOptions = Some (col, sort.SwapDirection()) }, Cmd.none
+                ))
+            let removeSort (ev: MouseEvent) =
+                dispatch (UpdateMsg (fun m ->
+                    { m with SortOptions = None }, Cmd.none
+                ))
+            yield span [ ClassName "buttons has-addons" ] [
+                span [ ClassName "button is-disabled is-primary"; Title (sprintf "%A" sort) ] [ str col.Title ]
+                span [ ClassName "button is-primary"; OnClick swapSortDirection; Title "Swap sort direction" ] [
+                    (match sort with
+                     | GridSortType.Ascending | GridSortType.AscendingString | GridSortType.AscendingDifference -> faIcon "" "angle-up"
+                     | _ -> faIcon "" "angle-down"
+                    )
+                ]
+                span [ ClassName "button is-primary"; OnClick removeSort; Title "Remove sort" ] [
+                    faIcon "" "times"
+                ]
+            ]
 
     ]
 
@@ -500,7 +571,7 @@ let viewGroupDetails =
     | ReportGroupDetails.NoInfo -> div [] []
 
 let viewData (verA, verB) (model: ComparisonData) (gridSettings: GridLayoutSettings) gridSettingsDispatch =
-    let pairs = model.GetPairs() |> gridSettings.PreprocessRows (fun (a, _) -> a.Data)
+    let pairs = model.GetPairs gridSettings
     div [] [
         (
             if model.BaseDescription = model.TargetDescription then

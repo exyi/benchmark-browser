@@ -204,3 +204,15 @@ let littleDropDownIcon =
     // ]
 let dropDownLittleMenu body =
     dropDownMenu (littleDropDownIcon) body
+
+
+module Option =
+    let bind2 mapping a b =
+        match (a, b) with
+        | (Some a, Some b) -> mapping a b
+        | _ -> None
+
+    let map2 mapping a b =
+        match (a, b) with
+        | (Some a, Some b) -> mapping a b |> Some
+        | _ -> None
