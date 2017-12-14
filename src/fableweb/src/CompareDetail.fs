@@ -14,6 +14,7 @@ open Elmish
 open Fable.Import.React
 open Fable.Core.JsInterop
 open PublicModel.PerfReportModel
+open System.Data
 
 let splitLastSegment (str: string) =
             let lastDot = str.LastIndexOf('.')
@@ -54,12 +55,33 @@ type GridColumnDescriptor = {
     Getter: GridColumnValueGetter
 }
 
+[<RequireQualifiedAccessAttribute>]
+type GridSortType =
+    | Ascending
+    | Descending
+    | AscendingDifference
+    | DescendingDifference
+
+
+[<RequireQualifiedAccessAttribute>]
+type GridFilterDescriptor =
+    | Equals of allowed: TestResultValue [] * available: TestResultValue []
+    | Range of float * float
+with
+    member x.Predicate value =
+        match x with
+        | Equals (allowed, _) -> Array.contains value allowed
+        | Range(a, b) ->
+            TestResultValue.GetComparable value |> Option.map (fun x -> a <= x && x <= b) |> Option.defaultValue false
+
 type GridLayoutSettings = {
     Columns: GridColumnDescriptor[]
     InactiveColumns: GridColumnDescriptor[]
+    SortOptions: (GridColumnDescriptor * GridSortType) option
+    Filters: (GridColumnDescriptor * GridFilterDescriptor) []
 }
 with
-    static member Empty = { Columns = [||]; InactiveColumns = [||] }
+    static member Empty = { Columns = [||]; InactiveColumns = [||]; SortOptions = None; Filters = [||] }
     member x.AddColumnsFromData (data: WorkerSubmission[]) =
         let mapMap (ctor: string -> 'b) (theMap: Map<string, 'a>) : seq<string * 'b> =
             theMap |> Map.toSeq |> Seq.map fst |> Seq.distinct |> Seq.map (fun x -> x, ctor x)
@@ -89,6 +111,18 @@ with
         let newCols = columns |> Seq.filter (fun x -> not <| Set.contains x thisColMap) |> Seq.toArray
 
         { x with Columns = Array.append x.Columns newCols }
+
+    member x.PreprocessRows getKey (data: 'a []) =
+        data
+        |> Array.filter (fun row ->
+            let row = getKey row
+            x.Filters |> Seq.forall (fun (col, filter) -> col.Getter.Eval row |> Option.map filter.Predicate |> Option.defaultValue false)
+        )
+        // |> Array.sortBy (fun row ->
+        //     x.SortOptions |> Option.map (
+        //         let row = getKey row
+        //     )
+        // )
 
 let private cmpOptions = ComparisonOptions.Default
 let private createMappingKey (s: WorkerSubmission) =
@@ -255,6 +289,38 @@ let viewFileColumns isCompare (tuples: (BenchmarkReport * BenchmarkReport) array
             ]
     ]
 
+let viewFilterEditor allowDeleteButton filter updateFilter = seq {
+    match filter with
+    | GridFilterDescriptor.Equals (values, moreValues) ->
+        let setFilterEvent value (ev: FormEvent) =
+            ev.preventDefault()
+            let newFilter =
+                if Array.contains value values then
+                    GridFilterDescriptor.Equals (Array.except [|value|] values, Array.append [| value |] moreValues)
+                else
+                    GridFilterDescriptor.Equals (Array.append [|value|] values, Array.except [| value |] moreValues)
+            updateFilter (Some newFilter)
+
+        if allowDeleteButton then
+            yield button [ ClassName "button is-danger"; OnClick (fun _ -> updateFilter None) ] [ Utils.faIcon "is-small" "times"; str "Remove" ]
+
+        let allValues = Array.append values moreValues |> Array.sortBy (sprintf "%A")
+        for v in allValues do
+            yield label [ ClassName "checkbox" ] [
+                    input [ HTMLAttr.Type "checkbox"; OnChange (setFilterEvent v); Checked (Array.contains v values) ]
+                    viewValue v
+                ]
+    | GridFilterDescriptor.Range _ as f ->
+        yield str (sprintf "%A" f)
+}
+
+let private setSettingsFilter settingsDispatch column replaceFilter value =
+    settingsDispatch (UpdateMsg (fun m ->
+        let newFilters = m.Filters |> Array.except [| (column, replaceFilter) |] |> Array.append (match value with Some value -> [| (column, value) |] | _ -> Array.empty)
+        if value.IsNone then
+            closeDropdown()
+        { m with Filters = newFilters }, Cmd.none
+    ))
 
 
 let viewResultsGrid (tuples: (BenchmarkReport * BenchmarkReport) array) (settings: GridLayoutSettings) settingsDispatch =
@@ -295,9 +361,30 @@ let viewResultsGrid (tuples: (BenchmarkReport * BenchmarkReport) array) (setting
             { m with Columns = cols }, Cmd.none))
 
     let headerMenu (column: GridColumnDescriptor) =
+        let realFilters = settings.Filters |> Array.filter (fun (col, filter) -> col = column)
+        let filterableItems =
+            tuples
+            |> Array.choose (fun (x, _) -> column.Getter.Eval x.Data)
+            |> Array.groupBy id
+            |> Array.filter (fun (key, values) -> values.Length >= 1)
+            |> Array.sortBy (fun (key, _) -> sprintf "%A" key)
+            // [|
+            //     if filterableItems.Length then
+            //         yield GridFilterDescriptor.Equals([||], [|  |])
+            // |]
+        let setFilter = setSettingsFilter settingsDispatch column
         [
-            p [] [ str column.Legend ]
-            button [ ClassName "button"; OnClick (fun ev -> removeColumn column; ev.preventDefault()) ] [ str "Remove" ]
+            yield p [] [ str column.Legend ]
+            yield button [ ClassName "button"; OnClick (fun ev -> removeColumn column; ev.preventDefault()) ] [ str "Remove" ]
+            if realFilters.Length >= 1 then
+                yield p [] [ str "Filter:" ]
+                for (_, filter) in realFilters do
+                    yield! viewFilterEditor true filter (setFilter filter)
+
+            else if filterableItems.Length > 0 then
+                yield p [] [ str "Add Filter: " ]
+                let filter = GridFilterDescriptor.Equals ([||], filterableItems |> Array.map fst)
+                yield! viewFilterEditor false filter (setFilter filter)
         ]
 
     let sortableHeaderItem =
@@ -359,7 +446,7 @@ let viewSettingsPanel (data: ComparisonData) (model: GridLayoutSettings) dispatc
     ]
 
     div [] [
-        Utils.dropDownMenu (
+        yield Utils.dropDownMenu (
             button
                 [ ClassName "button"; Disabled (model.InactiveColumns.Length = 0) ]
                 [ str "Add column"; Utils.littleDropDownIcon ])
@@ -368,7 +455,7 @@ let viewSettingsPanel (data: ComparisonData) (model: GridLayoutSettings) dispatc
                                 button [ ClassName "button is-small"; Title col.Legend; OnClick (addColumn col) ] [ str col.Title ])
                                 |> Seq.toList
                     ))
-        Utils.dropDownMenu (
+        yield Utils.dropDownMenu (
             button
                 [ ClassName "button "; Disabled (model.Columns.Length = 0) ]
                 [ str "Remove columns"; Utils.littleDropDownIcon ])
@@ -378,9 +465,15 @@ let viewSettingsPanel (data: ComparisonData) (model: GridLayoutSettings) dispatc
                                 |> Seq.toList
                     ))
 
-        Utils.dropDownMenu
+        yield Utils.dropDownMenu
             (button [ ClassName "button" ] [ str "Attached files"; Utils.littleDropDownIcon ])
-            (lazy ([viewFileColumns (data.BaseDescription <> data.TargetDescription) (data.GetPairs())]))
+            (lazy ([viewFileColumns (data.BaseDescription <> data.TargetDescription) (data.GetPairs() |> model.PreprocessRows (fun (a, _) -> a.Data))]))
+
+        for (column, filter) in model.Filters do
+            yield Utils.dropDownMenu
+                (button [ ClassName "button is-link" ] [ str ("Filter " + column.Title); Utils.littleDropDownIcon ])
+                (lazy (List.ofSeq <| viewFilterEditor true filter (setSettingsFilter dispatch column filter)))
+
     ]
 
 let viewGroupDetails =
@@ -406,8 +499,8 @@ let viewGroupDetails =
         ]
     | ReportGroupDetails.NoInfo -> div [] []
 
-let viewData (verA, verB) (model: ComparisonData) gridSettings gridSettingsDispatch =
-    let pairs = model.GetPairs()
+let viewData (verA, verB) (model: ComparisonData) (gridSettings: GridLayoutSettings) gridSettingsDispatch =
+    let pairs = model.GetPairs() |> gridSettings.PreprocessRows (fun (a, _) -> a.Data)
     div [] [
         (
             if model.BaseDescription = model.TargetDescription then

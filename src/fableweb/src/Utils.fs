@@ -125,6 +125,7 @@ module Components =
     type DropDownProps = {
         Title: ReactElement
         Body: Lazy<ReactElement list>
+        InvalidationGuid: Guid
     }
     [<Pojo>]
     type DropDownState = {
@@ -192,7 +193,7 @@ module Components =
 
 open Components
 let dropDownMenu title body =
-    let props = { DropDownProps.Title = title; Body = body }
+    let props = { DropDownProps.Title = title; Body = body; InvalidationGuid = Guid() }
     createElement(typedefof<DropDown>, props, [])
 
 let faIcon size icon = span [ Props.HTMLAttr.ClassName ("icon " + size) ] [ i [ Props.HTMLAttr.ClassName ("fa fa-" + icon) ] [] ]
