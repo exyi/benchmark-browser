@@ -192,6 +192,8 @@ module Components =
 
 
 open Components
+open Fable.Core.JsInterop
+open PublicModel.PerfReportModel
 let dropDownMenu title body =
     let props = { DropDownProps.Title = title; Body = body; InvalidationGuid = Guid() }
     createElement(typedefof<DropDown>, props, [])
@@ -216,3 +218,78 @@ module Option =
         match (a, b) with
         | (Some a, Some b) -> mapping a b |> Some
         | _ -> None
+
+
+let viewCommitInfo (commit: GitCommitInfo) =
+    p [] [
+        strong [] [ str commit.Author ]
+        str " "
+        commit.Signature |> Option.map (fun sign -> span [] [ str sign; faIcon "is-small has-text-success" "check" ]) |> Option.defaultValue (str "")
+        str " "
+        span [ Props.Title (string commit.Time) ] [ str ((commit.Time |> box :?> string |> DateTime.Parse).ToShortDateString()) ]
+        str " "
+        small [] [ str commit.Hash ]
+
+        br []
+
+        str commit.Subject
+    ]
+
+type NonTransparentBox<'a> = {
+    MagicHiddenValue: 'a
+}
+let makeBlackbox a = { MagicHiddenValue = a }
+let unblackbox a = a.MagicHiddenValue
+
+
+module Recharts =
+    let LineChart : Fable.Import.React.ComponentClass<obj> = JsInterop.import "LineChart" "recharts"
+    let Line : Fable.Import.React.ComponentClass<obj> = JsInterop.import "Line" "recharts"
+    let CartesianGrid : Fable.Import.React.ComponentClass<obj> = JsInterop.import "CartesianGrid" "recharts"
+    let Tooltip : Fable.Import.React.ComponentClass<obj> = JsInterop.import "Tooltip" "recharts"
+    let ResponsiveContainer : Fable.Import.React.ComponentClass<obj> = JsInterop.import "ResponsiveContainer" "recharts"
+
+    let lineChart (data: obj []) (click : Func<unit, unit>) (content: ReactElement list) : ReactElement =
+        createElement(ResponsiveContainer,
+            createObj [
+                "height" ==> 200
+                "width" ==> "100%"
+
+            ],
+            [
+                createElement(LineChart,
+                    (createObj [
+                        "data" ==> data
+                        "onClick" ==> click
+                    ]),
+                    content
+                )
+            ]
+        )
+
+    let lineComponent (lineType: string) stroke (dataKey: obj -> obj) : ReactElement =
+        createElement(Line,
+            (createObj [
+                "type" ==> lineType
+                "dataKey" ==> dataKey
+                "stroke" ==> stroke
+            ]),
+            []
+        )
+    let cartesianGrid (color: string) : ReactElement =
+        createElement(
+            CartesianGrid,
+            createObj [
+                "stroke" ==> color
+            ],
+            []
+        )
+    let tooltip (content: obj -> ReactElement) : ReactElement =
+        createElement(
+            Tooltip,
+            createObj [
+                "isAnimationActive" ==> false
+                "content" ==> content
+            ],
+            []
+        )

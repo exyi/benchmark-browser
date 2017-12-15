@@ -98,9 +98,18 @@ type CommitRelativePerformance = {
     Count: int
 }
 
+type GitCommitInfo = {
+    Hash: string
+    Parents: string[]
+    Signature: string option
+    Author: string
+    Time: DateTime
+    Subject: string
+}
+
 type ProjectPerfSummary = {
     // List of name * (graph data = commit * numbers)
-    DetailedBranches: (string * (string * CommitRelativePerformance) []) []
+    DetailedBranches: (string * (GitCommitInfo * CommitRelativePerformance) []) []
     // List of name * commit * numbers
     HeadOnlyBranches: (string * string * CommitRelativePerformance) []
 }
@@ -124,14 +133,6 @@ with
 type ReportGroupSelector =
     | Version of string
 
-type GitCommitInfo = {
-    Hash: string
-    Parents: string[]
-    Signature: string option
-    Author: string
-    Time: DateTime
-    Subject: string
-}
 
 [<RequireQualifiedAccessAttribute>]
 type ReportGroupDetails =

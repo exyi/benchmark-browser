@@ -11,25 +11,24 @@ open Elmish
 open PublicModel.PerfReportModel
 open Fable.Core
 open Fable.Core.JsInterop
-open PublicModel.PerfReportModel
 
 // [<Fable.Core.>]
 // type TrendControl = class inherit Component<obj, obj> end
 
-[<RequireQualifiedAccessAttribute>]
-type TrendProp =
-    | Data of obj array
-    | Gradient of string array
-    | Smooth of bool
-    | Radius of int
-    | AutoDraw of bool
-    | AutoDrawDuration of float
-    | AutoDrawEasing of string
+// [<RequireQualifiedAccessAttribute>]
+// type TrendProp =
+//     | Data of obj array
+//     | Gradient of string array
+//     | Smooth of bool
+//     | Radius of int
+//     | AutoDraw of bool
+//     | AutoDrawDuration of float
+//     | AutoDrawEasing of string
 
-    interface IProp
+//     interface IProp
 
-let trendControl (props: IProp list) =
-    React.createElement (JsInterop.importDefault "react-trend", JsInterop.keyValueList Fable.Core.CaseRules.LowerFirst props, [])
+// let trendControl (props: IProp list) =
+//     React.createElement (JsInterop.importDefault "react-trend", JsInterop.keyValueList Fable.Core.CaseRules.LowerFirst props, [])
 
 type Model = {
     Test: LoadableData<DashboardModel>
@@ -110,18 +109,32 @@ let viewTestedHeads masterCommit (model: (string * string * CommitRelativePerfor
         ]
 
 let viewPerfData (model: ProjectPerfSummary) =
-    let viewBranchTrend (name, data : _ array) =
+    let masterCommit = (model.DetailedBranches |> Seq.head |> snd |> Seq.last |> fst).Hash
+    let viewBranchTrend (name, data : (_ * CommitRelativePerformance) array) =
+        let mutable lastTooltip = None
+        let onClick () =
+            Fable.Import.Browser.window.location.href <- (sprintf "#/compare/commits/%s/%s" masterCommit lastTooltip.Value.Hash)
+            ()
         div [ ClassName "box" ] [
             span [ ClassName "title is-4" ] [ str name ]
             span [] [ str (sprintf " - %d tests" data.Length) ]
-            trendControl [
-                TrendProp.Data (data |> Array.map (fun (_name, p) -> box p.AvgTime))
-                TrendProp.AutoDraw true
-                TrendProp.AutoDrawDuration 500.0
-                TrendProp.AutoDrawEasing "ease-in"
-                TrendProp.Smooth true
-                TrendProp.Radius 20
-                TrendProp.Gradient [| "#00c6ff"; "#F0F"; "#FF0" |]
+            Recharts.lineChart (data |> Array.map (fun p -> box (makeBlackbox p))) (System.Func<_, _> onClick) [
+                Recharts.lineComponent "monotone" "#8884d8" (fun x -> (x |> unbox |> unblackbox |> snd).AvgTime |> box)
+                Recharts.lineComponent "monotone" "#8884d8" (fun x -> (x |> unbox |> unblackbox |> snd).MaxTime |> box)
+                Recharts.lineComponent "monotone" "#8884d8" (fun x -> (x |> unbox |> unblackbox |> snd).MinTime |> box)
+                Recharts.cartesianGrid "#ccc"
+                Recharts.tooltip (fun hovno ->
+                    !! hovno?payload |> Array.truncate 1 |> Array.collect (fun payload ->
+                        let (commit: GitCommitInfo, data: CommitRelativePerformance) = unblackbox (!!payload?payload)
+                        lastTooltip <- Some commit
+                        [|
+                            viewCommitInfo commit
+                            viewRelativePerf data
+                        |]
+                    )
+                    |> Array.toList
+                    |> div [ ClassName "box" ]
+                )
             ]
         ]
 
@@ -130,16 +143,16 @@ let viewPerfData (model: ProjectPerfSummary) =
             yield viewBranchTrend i
 
         if model.DetailedBranches.Length > 0 then
-            yield viewTestedHeads (model.DetailedBranches |> Seq.head |> snd |> Seq.head |> fst) model.HeadOnlyBranches
+            yield viewTestedHeads masterCommit model.HeadOnlyBranches
     ]
 
 
 let viewTestReport (model: TestRunListModel) =
     tr [ ClassName "tr" ] [
-        td [ClassName "td"] [ (model.Date |> string |> System.DateTime.Parse).ToShortDateString() |> str ]
-        td [ClassName "td"] [ a [ Href (sprintf "#taskBoard/%s" (string model.TaskDefId)) ] [ model.TaskFriendlyName |> str ] ]
-        td [ClassName "td"] [ model.Reports |> string |> str ]
-        td [ClassName "td"] [ a [ Href ("#detail/commit/" + model.ProjectVersion); Title "View detail of commit" ] [ str model.ProjectVersion ] ]
+        td [ ClassName "td"] [ (model.Date |> string |> System.DateTime.Parse).ToShortDateString() |> str ]
+        td [ ClassName "td"] [ a [ Href (sprintf "#taskBoard/%s" (string model.TaskDefId)) ] [ model.TaskFriendlyName |> str ] ]
+        td [ ClassName "td"] [ model.Reports |> string |> str ]
+        td [ ClassName "td"] [ a [ Href ("#detail/commit/" + model.ProjectVersion); Title "View detail of commit" ] [ str model.ProjectVersion ] ]
     ]
 
 let viewCore roleOracle (model: DashboardModel) dispatch =

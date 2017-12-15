@@ -272,20 +272,52 @@ let private sortRepoToBranches (repoStructure: CompleteRepoStructure) =
             commit <- repoStructure.Commits.[commit.Value].Parents |> Seq.tryHead
     result
 
+let private findLongestPath (testedVersions: TestedProjectVersionInfo seq) (repoStructure: CompleteRepoStructure) =
+    let lessThan = testedVersions |> Seq.map (fun x -> x.ProjectVersion, HashSet()) |> Map.ofSeq
+
+    for v in testedVersions do
+        repoStructure.LogFrom v.ProjectVersion
+        |> Seq.skip 1
+        |> Seq.choose (fun c -> lessThan.TryFind c.Hash)
+        |> Seq.iter (fun m -> m.Add(v.ProjectVersion) |> ignore)
+
+    // let root = lessThan |> Map.toSeq |> Seq.maxBy (fun (_, map) -> map.Count)
+    // find the longest path from the root
+    let rec findLongestPath =
+        let cache = Collections.Concurrent.ConcurrentDictionary<string, string list>()
+        (fun a -> cache.GetOrAdd(a, fun from ->
+            printfn "from: %s -> %A" from lessThan.[from]
+            if Seq.isEmpty lessThan.[from] then
+                [ from ]
+            else
+                let longestPath = lessThan.[from] |> Seq.map findLongestPath |> Seq.maxBy List.length
+                from :: longestPath
+        ))
+
+    if Seq.isEmpty lessThan then
+        []
+    else
+        let keys = lessThan |> Map.toSeq |> Seq.map fst
+        keys |> Seq.map findLongestPath |> Seq.maxBy List.length
 
 let private createPerfSummary testedVersions (repoStructure: CompleteRepoStructure) dbSession =
     let sortedbranches = sortRepoToBranches repoStructure
     let testedHeads = testedVersions |> Seq.groupBy (fun x -> match sortedbranches.TryGetValue(x.ProjectVersion) with (true, b) -> b | _ -> "")
-    let masterTests =
-        testedVersions.Join((repoStructure.LogFrom "refs/heads/master"), (fun x -> x.ProjectVersion), (fun x -> x.Hash), (fun a b -> a,b))
-        |> Seq.sortByDescending (fun (_, c) -> c.Time)
+    let mainBranch =
+        let versions = testedVersions.ToDictionary(fun x -> x.ProjectVersion)
+        findLongestPath testedVersions repoStructure
+        |> Seq.map (fun v -> versions.[v], repoStructure.Commits.[v])
         |> Seq.toArray
-    let head = masterTests |> Seq.tryHead |> Option.orElseWith (fun x -> Seq.tryHead testedVersions |> Option.map (fun x -> x, repoStructure.Commits.[x.ProjectVersion]))
+    // let masterTests =
+    //     testedVersions.Join((repoStructure.LogFrom "refs/heads/master"), (fun x -> x.ProjectVersion), (fun x -> x.Hash), (fun a b -> a,b))
+    //     |> Seq.sortByDescending (fun (_, c) -> c.Time)
+    //     |> Seq.toArray
+    let head = mainBranch |> Seq.tryLast |> Option.orElseWith (fun x -> Seq.tryHead testedVersions |> Option.map (fun x -> x, repoStructure.Commits.[x.ProjectVersion]))
     match head with
     | None -> { PerfReportModel.ProjectPerfSummary.DetailedBranches = [||]; HeadOnlyBranches = [||] } |> Task.FromResult
     | Some(head, headC) ->
         let compare (a_versionInfo: TestedProjectVersionInfo) (b_versionInfo) = getVersionComparison (a_versionInfo.ProjectVersion, Some a_versionInfo.Count) (b_versionInfo.ProjectVersion, Some b_versionInfo.Count) dbSession
-        let masterComparisons = masterTests |> Seq.map (fun (t, _) -> compare head t) |> Seq.toArray
+        let masterComparisons = mainBranch |> Seq.map (fun (t, _) -> compare head t) |> Seq.toArray
         let headsComparisons = testedHeads |> Seq.map (fun (branchName, t) -> compare head (Seq.head t) |> liftTask (fun a -> branchName, a)) |> Seq.toArray
 
         task {
@@ -293,7 +325,7 @@ let private createPerfSummary testedVersions (repoStructure: CompleteRepoStructu
             let! headsComparisons = Task.WhenAll headsComparisons
             return
                 {
-                   ProjectPerfSummary.DetailedBranches = [| "master", (masterComparisons |> Array.map (fun c -> (fst c.CommitB), (c.SummaryGroups.[""].ColumnSummary.["Time"]))) |]
+                   ProjectPerfSummary.DetailedBranches = [| "master", (masterComparisons |> Array.map (fun c -> (repoStructure.Commits.[fst c.CommitB]), (c.SummaryGroups.[""].ColumnSummary.["Time"]))) |]
                    HeadOnlyBranches = [| for branch, data in headsComparisons do yield branch, fst data.CommitB, data.SummaryGroups.[""].ColumnSummary.["Time"] |]
                 }
         }

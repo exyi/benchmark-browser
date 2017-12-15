@@ -16,6 +16,7 @@
     "react-dom": "^15.6.2",
     "react-sortable-hoc": "^0.6.8",
     "react-trend": "^1.2.4",
+    "recharts": "^1.0.0-beta.6",
     "remotedev": "^0.2.7"
   },
   "devDependencies": {

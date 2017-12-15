@@ -553,19 +553,7 @@ let viewGroupDetails =
         div [ ClassName "box" ] [
             for commit in commits do
                 yield div [ ClassName "content" ] [
-                    p [] [
-                        strong [] [ str commit.Author ]
-                        str " "
-                        commit.Signature |> Option.map (fun sign -> span [] [ str sign; faIcon "is-small has-text-success" "check" ]) |> Option.defaultValue (str "")
-                        str " "
-                        span [ Title (string commit.Time) ] [ str ((commit.Time |> box :?> string |> DateTime.Parse).ToShortDateString()) ]
-                        str " "
-                        small [] [ str commit.Hash ]
-
-                        br []
-
-                        str commit.Subject
-                    ]
+                    viewCommitInfo commit
                 ]
         ]
     | ReportGroupDetails.NoInfo -> div [] []
