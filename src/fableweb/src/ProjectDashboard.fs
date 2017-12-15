@@ -109,7 +109,7 @@ let viewTestedHeads masterCommit (model: (string * string * CommitRelativePerfor
         ]
 
 let viewPerfData (model: ProjectPerfSummary) =
-    let masterCommit = (model.DetailedBranches |> Seq.head |> snd |> Seq.last |> fst).Hash
+    let masterCommit = model.DetailedBranches |> Seq.tryHead |> Option.bind (snd >> Seq.tryLast) |> Option.map (fun (x, _) -> x.Hash) |> Option.defaultValue "bad"
     let viewBranchTrend (name, data : (_ * CommitRelativePerformance) array) =
         let mutable lastTooltip = None
         let onClick () =

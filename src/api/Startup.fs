@@ -9,11 +9,20 @@ open Microsoft.Extensions.DependencyInjection
 open Giraffe.HttpHandlers
 open Giraffe.Middleware
 open Microsoft.IdentityModel.Tokens
+open Microsoft.Extensions.Configuration
 
 
 type Startup() =
     member x.ConfigureServices(services: IServiceCollection) =
-        let key = SymmetricSecurityKey(Text.Encoding.UTF8.GetBytes("lkasjdlkadjlkdfjglasjkfdsa")) :> SecurityKey
+        let configuration =
+            let builder =
+                ConfigurationBuilder().SetBasePath(IO.Path.GetFullPath ".").AddJsonFile("appsettings.json", true).AddEnvironmentVariables()
+            builder.Build()
+        let connectionString : string = configuration.GetValue "ConnectionString"
+        let apiPrivateKey : string = configuration.GetValue "ApiPrivateKey"
+
+
+        let key = SymmetricSecurityKey(Text.Encoding.UTF8.GetBytes(apiPrivateKey)) :> SecurityKey
         services.AddSingleton({ Authentication.SecretKey.Key = key }) |> ignore
         services.AddDataProtection() |> ignore
         services.AddCors() |> ignore
@@ -29,7 +38,7 @@ type Startup() =
             opt.TokenValidationParameters.IssuerSigningKey <- key
         ) |> ignore
 
-        services.AddSingleton<Marten.IDocumentStore>(DataAccess.DatabaseOperation.connectMarten "host=localhost;database=perf-tests") |> ignore
+        services.AddSingleton<Marten.IDocumentStore>(DataAccess.DatabaseOperation.connectMarten connectionString) |> ignore
 
         ()
 

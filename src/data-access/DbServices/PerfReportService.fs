@@ -286,7 +286,6 @@ let private findLongestPath (testedVersions: TestedProjectVersionInfo seq) (repo
     let rec findLongestPath =
         let cache = Collections.Concurrent.ConcurrentDictionary<string, string list>()
         (fun a -> cache.GetOrAdd(a, fun from ->
-            printfn "from: %s -> %A" from lessThan.[from]
             if Seq.isEmpty lessThan.[from] then
                 [ from ]
             else
