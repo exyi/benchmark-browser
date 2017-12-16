@@ -1,6 +1,7 @@
 var path = require("path");
 var webpack = require("webpack");
 var fableUtils = require("fable-utils");
+const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
 
 function resolve(filePath) {
     return path.join(__dirname, filePath)
@@ -68,8 +69,18 @@ module.exports = {
             }
         ]
     },
-    plugins: true ? [] : [
-        new webpack.HotModuleReplacementPlugin(),
+    plugins: isProduction ? [
+    	//new UglifyJsPlugin({
+	    //uglifyOptions: {
+	      //ie8: false,
+	      //ecma: 6,
+	      //parse: {},
+	      //warnings: true
+	    //}
+	  //})
+
+    ] : [
+        //new webpack.HotModuleReplacementPlugin(),
         new webpack.NamedModulesPlugin()
     ]
 };

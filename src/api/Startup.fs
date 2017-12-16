@@ -10,6 +10,8 @@ open Giraffe.HttpHandlers
 open Giraffe.Middleware
 open Microsoft.IdentityModel.Tokens
 open Microsoft.Extensions.Configuration
+open Microsoft.AspNetCore.Builder
+open Microsoft.Extensions.FileProviders
 
 
 type Startup() =
@@ -57,6 +59,12 @@ type Startup() =
 
         app.UseGiraffe(ApiRouter.webApp)
 
-        app.Run(fun context -> context.Response.WriteAsync("Hello World!"))
+        app.UseStaticFiles(
+            let options = StaticFileOptions()
+            options.FileProvider <-
+                new PhysicalFileProvider(
+                    IO.Path.Combine(IO.Directory.GetCurrentDirectory(), "../fableweb/public"))
+            options
+        ) |> ignore
 
         ()

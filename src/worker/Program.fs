@@ -48,7 +48,7 @@ let converters = [|
 let getConfig (args: string array) =
     let file = args.[0]
     let config = IO.File.ReadAllText(file)
-    Newtonsoft.Json.JsonConvert.DeserializeObject<WorkerConfig>(config)
+    Newtonsoft.Json.JsonConvert.DeserializeObject<WorkerConfig>(config, converters)
 
 let sendRequest config (url:string) auth content =
     use client = new HttpClient()

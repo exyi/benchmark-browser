@@ -11,4 +11,6 @@ let root =
         [ str "About page" ]
       p
         [ ]
-        [ str "This template is a simple application build with Fable + Elmish + React." ] ]
+        [ str "See github "
+          a [ Href "https://github.com/exyi/benchmark-browser" ] [ str "exyi/benchmark-browser" ]
+         ] ]

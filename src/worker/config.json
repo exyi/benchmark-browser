@@ -1,7 +1,7 @@
 {
 	"ApiEndpoint": "http://localhost:5000",
     	"ApiUser": "exyi@exyi.cz",
-    	"ApiPassword": "test-password",
-    	"ApiOtp": null,
+    	"ApiPassword": "new-password",
+    	"ApiOtp": { "Key": "EAHXE5S3SZQNGQPNOY54XOVGPVTUQONX", "Size": 6, "Step": 15 },
     	"ClonedRepositories": "/tmp/perftests-worker-repos"
 }

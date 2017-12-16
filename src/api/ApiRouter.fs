@@ -73,21 +73,21 @@ let webApp : HttpHandler =
         routeCi "/login" >=> serveFunction Authentication.login
         routeCi "/changePassword" >=> requiresAuthentication accessDenied >=> serveFunction Authentication.changePassword
         routeCi "/upsertUser" >=> requireValidUser >=> requireAuth [ "Admin" ] >=> serveFunction Authentication.upsertUser
-        routeCi "/pushResults" >=> requireAuth ["Worker"; "Valid"] >=> serveFunction (TestReports.pushResults)
-        routeCi "/getMeSomeWork" >=> requireAuth ["Worker"; "Valid"] >=> serveFunction (WorkerHub.getMeSomeWork)
-        routeCi "/pushWorkStatus" >=> requireAuth ["Worker"; "Valid"] >=> serveFunction (WorkerHub.pushWorkStatus)
+        routeCi "/pushResults" >=> requireValidUser >=> requireAuth ["Worker"] >=> serveFunction (TestReports.pushResults)
+        routeCi "/getMeSomeWork" >=> requireValidUser >=> requireAuth ["Worker"] >=> serveFunction (WorkerHub.getMeSomeWork)
+        routeCi "/pushWorkStatus"  >=> requireValidUser >=> requireAuth ["Worker"] >=> serveFunction (WorkerHub.pushWorkStatus)
         routeCi "/home" >=> serveGetFunction (TestReports.getHomeModel)
         routeCi "/testdef/dashboard" >=> serveFunction (TestReports.dashboard)
         routeCi "/project/dashboard" >=> serveFunction (TestReports.projectDashboard)
         routeCi "/getReports" >=> serveFunction (TestReports.getReportGroup)
         routeCi "/compareReports" >=> serveFunction (TestReports.compareReportGroups)
-        routeCi "/enqueueTask" >=> requireAuth ["Admin"] >=> serveFunction (WorkerHub.enqueueWorkerTask)
-        routeCif "/pushFile/%s" (fun id -> requireAuth ["Worker"] >=> serveGetFunction (WorkerHub.pushFile StoredFileType.AnyAttachement id))
-        routeCif "/pushFile_stacks/%s" (fun id -> requireAuth ["Worker"] >=> serveGetFunction (WorkerHub.pushFile StoredFileType.CollectedStacks_Text id))
+        routeCi "/enqueueTask" >=> requireValidUser >=> requireAuth ["Admin"] >=> serveFunction (WorkerHub.enqueueWorkerTask)
+        routeCif "/pushFile/%s" (fun id ->  requireValidUser >=> requireAuth ["Worker"] >=> serveGetFunction (WorkerHub.pushFile StoredFileType.AnyAttachement id))
+        routeCif "/pushFile_stacks/%s" (fun id -> requireValidUser >=> requireAuth ["Worker"] >=> serveGetFunction (WorkerHub.pushFile StoredFileType.CollectedStacks_Text id))
         routeCif "/files/%s" TestReports.getFiles
 
         subRouteCi "/admin"
-            (requireAuth ["Admin"; "Valid"] >=> choose
+            (requireValidUser >=> requireAuth ["Admin"] >=> choose
             [
                 routeCi "/createTest" >=> serveFunction (AdminHub.createTestDefinition)
                 routeCi "/removeTest" >=> serveFunction (AdminHub.removeTestDefinition)
@@ -95,4 +95,5 @@ let webApp : HttpHandler =
 
         POST >=>
             choose [ ]
-        setStatusCode 404 >=> text "Not Found" ]
+        GET >=> routeCi "/" >=> htmlFile "../fableweb/public/index.html"
+    ]

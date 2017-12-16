@@ -194,7 +194,7 @@ let viewEnqueueForm id (model: WorkerModel.WorkerQueueItemFormModel, isLoading: 
             let cmd = Cmd.ofPromise
                         ApiClient.enqueueTask model
                         (fun x -> UpdateMsg(fun (m,_) -> (m, false), Cmd.none))
-                        (fun error -> UpdateMsg(fun (m,_) -> Fable.Import.Browser.window.alert (error.ToString()); (m, false), Cmd.none))
+                        (fun error -> UpdateMsg(fun (m,_) -> Fable.Import.Browser.window.alert (error.Message); (m, false), Cmd.none))
             (model, true), cmd
         ))
         ev.preventDefault()
