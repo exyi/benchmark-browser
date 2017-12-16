@@ -42,8 +42,16 @@ let login (ctx:HttpContext) (data:LoginData) =
         let! loginResult = UserService.loginUser data s
         return match loginResult with
                | LoginResult.Ok user ->
+                   printfn "User %s login" user.Email
                    let claims = (getClaims user)
                    let token = createJwt (ctx.RequestServices.GetRequiredService<SecretKey>()).Key claims
                    loginResult, Some (JwtSecurityTokenHandler().WriteToken(token))
                | _ -> loginResult, None
     })
+
+let changePassword ctx data =
+    let user = getCurrentUserId ctx
+    DatabaseOperation.execOperation ctx (UserService.changePassword user data)
+
+let upsertUser ctx data =
+    DatabaseOperation.execOperation ctx (UserService.upsertUser data)

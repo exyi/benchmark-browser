@@ -55,6 +55,8 @@ let forbidden roles = setStatusCode 403 >=> text (sprintf "Forbidden, you would 
 let requireAuth roles : HttpHandler =
     requiresAuthentication accessDenied >=> requiresRoleOf roles (forbidden roles)
 
+let requireValidUser = requireAuth [ "Valid" ]
+
 // let authImpl : AccountManagement.AuthApi = {
 //     login = Authentication.login
 // }
@@ -69,6 +71,8 @@ let webApp : HttpHandler =
             ]
         routeCi "/echoLogin" >=> serveFunction (fun _ (a:AccountManagement.LoginData) -> task { return a })
         routeCi "/login" >=> serveFunction Authentication.login
+        routeCi "/changePassword" >=> requiresAuthentication accessDenied >=> serveFunction Authentication.changePassword
+        routeCi "/upsertUser" >=> requireValidUser >=> requireAuth [ "Admin" ] >=> serveFunction Authentication.upsertUser
         routeCi "/pushResults" >=> requireAuth ["Worker"; "Valid"] >=> serveFunction (TestReports.pushResults)
         routeCi "/getMeSomeWork" >=> requireAuth ["Worker"; "Valid"] >=> serveFunction (WorkerHub.getMeSomeWork)
         routeCi "/pushWorkStatus" >=> requireAuth ["Worker"; "Valid"] >=> serveFunction (WorkerHub.pushWorkStatus)

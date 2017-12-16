@@ -66,3 +66,23 @@ type RegistrationResult =
 type AuthApi = {
     login: LoginData -> UserDetails * (string option)
 }
+
+type ChangePasswordRequest = {
+    OldPassword: string
+    NewPassword: string
+    Otp: string
+}
+
+type ChangePasswordResponse = {
+    Otp: TotpAuthToken
+}
+
+type UpsertUserRequest = {
+    Email: string
+    Roles: string
+}
+
+[<RequireQualifiedAccessAttribute>]
+type UpsertUserResponse =
+    | UserCreated of password: string
+    | UserUpdated

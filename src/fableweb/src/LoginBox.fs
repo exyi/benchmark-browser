@@ -24,7 +24,7 @@ type Model = {
 }
 with member x.HasRole role =
         match x.State with
-        | State.LoggedIn info -> Array.contains role info.Roles
+        | State.LoggedIn info -> role = "" || Array.contains role info.Roles
         | _ -> false
 
 let rec createDialogMsg (msg: UpdateMsg<DialogModel>) =

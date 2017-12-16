@@ -60,6 +60,7 @@ type User = {
 }
 with
     member x.ToUserDetails() = { UserDetails.Id = x.Id; Email = x.Email; HasTmpPassword = x.Login.IsTmpLogin; Roles = x.Roles }
+    static member Create email login = { Id = Guid(); Email = email; Login = login; KeybaseUserName = None; GithubUserName = None; Roles = [||] }
 
 [<CLIMutableAttribute>]
 type KeybaseAuthRequest = {

@@ -11,6 +11,8 @@ open System
 open Fable.Helpers.React
 open PublicModel
 open PublicModel.PerfReportModel
+open PublicModel.AccountManagement
+open PublicModel.AccountManagement
 let endpoint = "http://localhost:5000"
 
 let removeStoredTokens () =
@@ -67,6 +69,12 @@ let login (data: LoginData) : (LoginResult) JS.Promise =
         | _ -> ()
         result
     )
+
+let changePassword (data: ChangePasswordRequest) : (Result<ChangePasswordResponse, string>) JS.Promise =
+    execApiRequest "changePassword" data []
+
+let upsertUser (data: UpsertUserRequest) : (UpsertUserResponse) JS.Promise =
+    execApiRequest "upsertUser" data []
 
 let createTaskDefinition (form:PublicModel.ProjectManagement.TestDefFormModel) : (Result<PublicModel.ProjectManagement.TestDefEntity, string>) JS.Promise =
     execApiRequest "admin/createTest" form []

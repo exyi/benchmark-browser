@@ -17,6 +17,7 @@ importAll "../sass/main.sass"
 open Fable.Helpers.React
 open Fable.Helpers.React.Props
 open Utils
+open Admin
 
 let menuItem label page currentPage =
     a
@@ -34,6 +35,9 @@ let menu currentPage userRoleOracle (options: PageOptions) optionsDispatch =
              yield menuItem "About" Page.About currentPage
              if userRoleOracle "Admin" then
                  yield menuItem "Create Task Definition" (Admin AdminPage.NewTaskDef) currentPage
+                 yield menuItem "Create/Update User" (Admin AdminPage.UpsertUser) currentPage
+             if userRoleOracle "" then
+                 yield menuItem "Change Password" (Admin AdminPage.ChangePassword) currentPage
            ]
            span [ Style [Width "20px"] ] []
            a [
@@ -62,6 +66,10 @@ let root model dispatch =
           | Some (m) when m.Id.IsSome && m.Id.Value.ToString() = pid ->
                Admin.EditProject.renderView m (UpdateMsg'.liftSome () >> liftEditProject >> AdminMsg >> dispatch)
           | _ -> str "Loading project..."
+    | Admin AdminPage.ChangePassword ->
+        Admin.Global.viewChangePassword model.admin.ChangePassword (dispatch << AdminMsg << Admin.Global.liftChangePassword)
+    | Admin AdminPage.UpsertUser ->
+        Admin.Global.viewUpsertUser model.admin.UpsertUser (dispatch << AdminMsg << Admin.Global.liftUpsertUser)
     | ProjectDashboard id -> ProjectDashboard.viewProject model.loginBox.HasRole id model.board (BoardMsg >> dispatch)
     | TaskDashboard id -> ProjectDashboard.viewTask model.loginBox.HasRole id model.board (BoardMsg >> dispatch)
     | EnqueueTask id -> ProjectDashboard.viewEnqueueForm id model.board.NewItemModel (ProjectDashboard.Model.LiftNewItemMsg >> BoardMsg >> dispatch)

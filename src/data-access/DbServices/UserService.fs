@@ -74,6 +74,18 @@ let liftTask fn (arg: Task<'b>) = task {
     return fn a
 }
 
+let private verifyUser (user: User) password otp =
+    if LoginTokenHelper.ValidatePassword user.Login password |> not then LoginResult.WrongPassword
+    else
+        match user.Login.TotpAuthToken with
+        | None -> LoginResult.Ok (user.ToUserDetails())
+        | Some totp ->
+            if String.IsNullOrWhiteSpace otp then LoginResult.OtpRequired
+            else
+                let ok, _windowUsed = TotpTokenHelper.Validate totp otp
+                if ok then LoginResult.Ok (user.ToUserDetails())
+                else LoginResult.WrongOtp
+
 let loginUser (loginData: LoginData) (session:IDocumentSession) = task {
     let loginName = loginData.Login
     let! user = (query { for u in session.Query<User>() do
@@ -82,16 +94,7 @@ let loginUser (loginData: LoginData) (session:IDocumentSession) = task {
     match user with
     | None -> return LoginResult.UserDoesNotExist
     | Some user ->
-        if LoginTokenHelper.ValidatePassword user.Login loginData.Password |> not then return LoginResult.WrongPassword
-        else
-            return match user.Login.TotpAuthToken with
-                   | None -> LoginResult.Ok (user.ToUserDetails())
-                   | Some totp ->
-                        if String.IsNullOrWhiteSpace loginData.Otp then LoginResult.OtpRequired
-                        else
-                            let ok, _windowUsed = TotpTokenHelper.Validate totp loginData.Otp
-                            if ok then LoginResult.Ok (user.ToUserDetails())
-                            else LoginResult.WrongOtp
+        return verifyUser user loginData.Password loginData.Otp
 }
 
 let getLoginToken (userId:Guid) (session:IDocumentSession) = task {
@@ -99,4 +102,38 @@ let getLoginToken (userId:Guid) (session:IDocumentSession) = task {
     let token = ApiTokenHelper.GenerateToken user.Id (DateTime.MaxValue) (TimeSpan.FromHours(1.0))
     session.Store token
     return token
+}
+
+let changePassword (userId: Guid) (request: ChangePasswordRequest) (session:IDocumentSession) = task {
+    let! user = session.LoadAsync<User> userId
+    match verifyUser user request.OldPassword request.Otp with
+    | LoginResult.Ok details ->
+        let newToken = LoginTokenHelper.CreatePassword(request.NewPassword, genTotp = true, isTmp = false)
+        session.Store({ user with Login = newToken })
+
+        return Ok ({ ChangePasswordResponse.Otp = newToken.TotpAuthToken.Value })
+    | a ->
+        return Error (sprintf "Invalid credentials: %A" a)
+}
+
+let upsertUser (request: UpsertUserRequest) (session: IDocumentSession) = task {
+    let mutable newPassword = ""
+    let! user =
+        (query {
+            for u in session.Query<User>() do
+            where (u.Email = request.Email)
+        }).ToListAsync()
+        |> liftTask Seq.tryHead
+        |> liftTask (Option.defaultWith(fun () ->
+            newPassword <- OtpNet.KeyGeneration.GenerateRandomKey(12) |> Convert.ToBase64String
+            let login = LoginTokenHelper.CreatePassword(newPassword, genTotp = false, isTmp = true)
+            User.Create request.Email login
+        ))
+    let user = { user with Roles = request.Roles.Split(',', ';') }
+    session.Store(user)
+    return
+        if String.IsNullOrEmpty newPassword then
+            UpsertUserResponse.UserUpdated
+        else
+            UpsertUserResponse.UserCreated newPassword
 }

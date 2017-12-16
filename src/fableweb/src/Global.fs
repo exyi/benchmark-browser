@@ -22,6 +22,8 @@ let toHash page =
       match page with
       | AdminPage.EditProject pid -> sprintf "#admin/editProject/%s" pid
       | AdminPage.NewTaskDef -> sprintf "#admin/newProject"
+      | AdminPage.UpsertUser -> "#admin/upsertUser"
+      | AdminPage.ChangePassword -> "#account/password"
   | ProjectDashboard id -> sprintf "#board/%s" id
   | EnqueueTask taskId -> sprintf "#taskBoard/%s/newTask" taskId
   | TaskDashboard taskId -> sprintf "#taskBoard/%s" taskId

@@ -11,6 +11,7 @@ open Fable.Import.RemoteDev.MsgTypes
 open Fable.Import.React
 open Fable.PowerPack
 open System.Text.RegularExpressions
+open Fable.PowerPack.Fetch
 
 
 type UpdateMsg<'a> = | UpdateMsg of ('a -> 'a * Cmd<UpdateMsg<'a>>)
@@ -84,13 +85,82 @@ module LoadableData' =
         | LoadableData.Error error ->
             div [ Props.HTMLAttr.ClassName "notification is-danger network-error" ] [ str error ]
 
+[<RequireQualifiedAccessAttribute>]
+type RequestResponseForm<'request, 'response> =
+    | Request of 'request * error: string
+    | Response of 'response
+    | Loading of 'request
+with
+    static member LiftRequest msg =
+        UpdateMsg'.lift
+            (function | Request (x, _) -> x | Loading x -> x | _ -> failwith "")
+            (fun m x -> match m with Request (_, e) -> Request(x, e) | Loading _ -> Loading x | _ -> Request (x, ""))
+            msg
+
+module RequestResponseForm' =
+    let view (model: RequestResponseForm<'request, 'response>) (dispatch: UpdateMsg<RequestResponseForm<'request, 'response>> -> unit) emptyRequest viewRequest viewResponse apiRequest =
+        match model with
+        | RequestResponseForm.Request (request, error) ->
+
+            let submitClick (event:MouseEvent) =
+                event.preventDefault()
+                dispatch (UpdateMsg (fun m ->
+                    let apiCmd =
+                        Cmd.ofPromise apiRequest request
+                            (function
+                             | Ok response ->
+                                UpdateMsg'.replace (RequestResponseForm.Response response)
+                             | Error error ->
+                                UpdateMsg'.replace (RequestResponseForm.Request (request, error))
+                            )
+                            (fun error -> UpdateMsg'.replace (RequestResponseForm.Request (request, error.Message)))
+                    RequestResponseForm.Loading request, apiCmd
+                ))
+            form [ ] [
+                viewRequest request (dispatch << RequestResponseForm<'request, 'response>.LiftRequest)
+
+                (if System.String.IsNullOrEmpty error then
+                    str ""
+                 else
+                    div [ Props.ClassName "notification is-danger" ] [
+                        str error
+                    ])
+
+                div [ Props.ClassName "field" ] [
+                    div [ Props.ClassName "control" ] [
+                        button [ Props.ClassName "button is-primary"; Props.OnClick submitClick; Props.Type "submit" ] [ str "Ok" ]
+                    ]
+                ]
+            ]
+        | RequestResponseForm.Loading request ->
+            form [ ] [
+                viewRequest request (dispatch << RequestResponseForm<'request, 'response>.LiftRequest)
+
+                div [ Props.ClassName "field" ] [
+                    div [ Props.ClassName "control" ] [
+                        button [ Props.ClassName "button is-primary is-loading"; Props.Type "submit" ] [ ]
+                    ]
+                ]
+            ]
+        | RequestResponseForm.Response response ->
+            let againClick (event: MouseEvent) =
+                event.preventDefault()
+                dispatch (UpdateMsg'.replace (RequestResponseForm.Request (emptyRequest, "")))
+            div [ ] [
+                viewResponse response
+                div [ Props.ClassName "field" ] [
+                    div [ Props.ClassName "control" ] [
+                        button [ Props.ClassName "button"; Props.OnClick againClick ] [ str "Again" ]
+                    ]
+                ]
+            ]
+
 
 let elementIf condition el =
     if condition then el
     else str ""
 
 let adminOnlyElement roleOracle = elementIf (roleOracle "Admin")
-
 
 let expectResultPromise (a:Fable.Import.JS.Promise<Result<'a, 'b>>) =
     a |> Promise.bind (function

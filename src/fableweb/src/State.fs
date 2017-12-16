@@ -20,6 +20,8 @@ let pageParser: Parser<Page->Page,Page> =
     map (Admin AdminPage.NewTaskDef) (s "admin" </> s "newProject")
     // map (Admin AdminPage.NewProject) (s "newProject")
     map (Admin << AdminPage.EditProject) (s "admin" </> s "editProject" </> str)
+    map (Admin <| AdminPage.UpsertUser) (s "admin" </> s "upsertUser")
+    map (Admin <| AdminPage.ChangePassword) (s "account" </> s "password")
     map ProjectDashboard (s "board" </> str)
     map TaskDashboard (s "taskBoard" </> str)
     map EnqueueTask (s "taskBoard" </> str </> s "enqueue")
@@ -38,8 +40,8 @@ let urlUpdate (result: Option<Page>) model =
       // Do some special behavior, like loading a model
       match page with
       | EnqueueTask id -> { model with board = { model.board with NewItemModel = ({ ProjectDashboard.initNewItemForm with TestDefId = id }, false) } }, Cmd.none
-      | ProjectDashboard id -> {model with board = ProjectDashboard.initState}, Cmd.map Msg.BoardMsg (Cmd.map ProjectDashboard.Model.LiftTestMsg (LoadableData'.loadData (expectResultPromise << ApiClient.loadProjectDashboard) id))
-      | TaskDashboard id -> {model with board = ProjectDashboard.initState}, Cmd.map Msg.BoardMsg (Cmd.map ProjectDashboard.Model.LiftTestMsg (LoadableData'.loadData (expectResultPromise << ApiClient.loadTestDefDashboard) id))
+      | ProjectDashboard id -> { model with board = ProjectDashboard.initState}, Cmd.map Msg.BoardMsg (Cmd.map ProjectDashboard.Model.LiftTestMsg (LoadableData'.loadData (expectResultPromise << ApiClient.loadProjectDashboard) id))
+      | TaskDashboard id -> { model with board = ProjectDashboard.initState}, Cmd.map Msg.BoardMsg (Cmd.map ProjectDashboard.Model.LiftTestMsg (LoadableData'.loadData (expectResultPromise << ApiClient.loadTestDefDashboard) id))
       | CompareDetail (vA, vB) ->
           { model with compare = { model.compare with Data = LoadableData.Loading } },
           Cmd.map Msg.CompareMsg (Cmd.map CompareDetail.Model.LiftDataMsg (LoadableData'.loadData (CompareDetail.ComparisonData.Load) (vA, vB)))
