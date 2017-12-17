@@ -61,7 +61,7 @@ let seedUsersIfNeeded (session:IDocumentSession) = task {
         session.Store(
             {
                 User.Id = Guid.NewGuid()
-                User.Email = "exyi@exyi.cz"
+                User.Email = "admin@whatever.com"
                 User.Login = LoginTokenHelper.CreatePassword("test-password", isTmp = true)
                 KeybaseUserName = None
                 GithubUserName = None
