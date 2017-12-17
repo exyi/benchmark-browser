@@ -33,9 +33,11 @@ Then there is the grid with all the data. It probably contains a lot of columns,
 By the way, if you don't like the empty borders on around the grid, there is a "Full width" switch on the top of the page.
 
 Above the grid, there is a menu called "Attached files" and it is used to access data attached to the tests - you can download them in a `zip` archive or view an aggregated [flame graph](https://github.com/BrendanGregg/FlameGraph) if it's from a profiler. The flamegraph url is `files/flame?<file ids>&q_width=<width of the result svg>` and you are supposed to manipulate this URL ;) - you can exclude/include certain tests in the benchmark and it has a few optional parameters:
-	* `q_title` - changes the title of the flame graph, useful if you want to share it with someone
-	* `q_colors` - change the colors, according to [FlameGraph](https://github.com/BrendanGregg/FlameGraph) docs - set color palette. choices are: hot (default), mem, io, wakeup, chain, java, js, perl, red, green, blue, aqua, yellow, purple, orange
-	* `q_dig` - show stack frames that start with the specified function (specified by substring, you don't have to enter full name)
+
+* `q_title` - changes the title of the flame graph, useful if you want to share it with someone
+* `q_colors` - change the colors, according to [FlameGraph](https://github.com/BrendanGregg/FlameGraph) docs - set color palette. choices are: hot (default), mem, io, wakeup, chain, java, js, perl, red, green, blue, aqua, yellow, purple, orange
+* `q_dig` - show stack frames that start with the specified function (specified by substring, you don't have to enter full name)
+
 Note that the sample counts in the flamegraph are adjusted, so all tests are represented equally.
 
 ## Administration

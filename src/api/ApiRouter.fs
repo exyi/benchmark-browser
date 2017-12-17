@@ -69,7 +69,6 @@ let webApp : HttpHandler =
             choose [
                 route "/text" >=> text "Something here"
             ]
-        routeCi "/echoLogin" >=> serveFunction (fun _ (a:AccountManagement.LoginData) -> task { return a })
         routeCi "/login" >=> serveFunction Authentication.login
         routeCi "/changePassword" >=> requiresAuthentication accessDenied >=> serveFunction Authentication.changePassword
         routeCi "/upsertUser" >=> requireValidUser >=> requireAuth [ "Admin" ] >=> serveFunction Authentication.upsertUser

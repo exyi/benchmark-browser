@@ -25,3 +25,5 @@ Now, it should be enough to run the `./run-worker.fish` script. It's recommended
 
 You can run multiple worker for one server, but they should run on the same type of hardware (and software), as comparing results from different mashine does not make much sense.
 
+Now, the only think missing are the benchmarks to run, the worker can currently only gather results from BenchmarkDotNet style exports, but can run any script that will behave like a BenchmarkDotNet process. Also check out a [json exporter used at dotvvm-benchmarks](https://github.com/riganti/dotvvm-benchmarks/blob/1934e7d3c6f1f313baab8097c694a40dc906ea59/DotVVM.Benchmarks/MyJsonExporter.cs), it exports a bit more info (includes columns in the export). You may also find the diagnosers the are used here interesting.
+
