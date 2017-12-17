@@ -47,6 +47,7 @@ let converters = [|
 
 let getConfig (args: string array) =
     let file = args.[0]
+    printf "Loading configuration from %s" (IO.Path.GetFullPath file)
     let config = IO.File.ReadAllText(file)
     Newtonsoft.Json.JsonConvert.DeserializeObject<WorkerConfig>(config, converters)
 

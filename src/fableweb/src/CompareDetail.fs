@@ -391,7 +391,7 @@ let viewResultsGrid (tuples: (BenchmarkReport * BenchmarkReport) array) (setting
             tuples
             |> Array.choose (fun (x, _) -> column.Getter.Eval x.Data)
             |> Array.groupBy id
-            |> Array.filter (fun (key, values) -> values.Length >= 1)
+            |> Array.filter (fun (key, values) -> values.Length > 1)
             |> Array.sortBy (fun (key, _) -> sprintf "%A" key)
             // [|
             //     if filterableItems.Length then
@@ -580,13 +580,13 @@ let viewData (verA, verB) (model: ComparisonData) (gridSettings: GridLayoutSetti
         (if model.BaseDescription <> model.TargetDescription then
             div [ ClassName "level" ] [
                 div [ ClassName "level-item" ] [
-                    a [ ClassName "button"; Href (Global.toHash (Global.Page.CompareDetail (verA, verA))) ] [ str "Detail" ]
+                    a [ ClassName "button"; Href (Global.toHash (Global.Page.CompareDetail (verA, verA))); Title "Go to detail of the Base version" ] [ str "Detail" ]
                 ]
                 div [ ClassName "level-item" ] [
-                    a [ ClassName "button"; Href (Global.toHash (Global.Page.CompareDetail (verB, verA))) ] [ str "Swap" ]
+                    a [ ClassName "button"; Href (Global.toHash (Global.Page.CompareDetail (verB, verA))); Title "Swap the Base and Target version" ] [ str "Swap" ]
                 ]
                 div [ ClassName "level-item" ] [
-                    a [ ClassName "button"; Href (Global.toHash (Global.Page.CompareDetail (verB, verB))) ] [ str "Detail" ]
+                    a [ ClassName "button"; Href (Global.toHash (Global.Page.CompareDetail (verB, verB))); Title"Go to detail of the Target version" ] [ str "Detail" ]
                 ]
             ]
         else
