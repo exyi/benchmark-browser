@@ -11,6 +11,7 @@ open System.Collections.Concurrent
 open System.Runtime.InteropServices.ComTypes
 open Giraffe.HttpHandlers
 open Fake.Tools.Git.Rebase
+open System.Runtime.InteropServices
 
 [<RequireQualifiedAccessAttribute>]
 /// Represents special type of stored file
@@ -103,17 +104,23 @@ let archivers : Map<string, (Map<string, string[]> -> ((unit -> Task<IO.Stream>)
         "zip", (fun _args files output -> task {
             use zip = new IO.Compression.ZipArchive(output, IO.Compression.ZipArchiveMode.Create, true)
             for file, name in files do
-                use! fileStream = file()
-                let entry = zip.CreateEntry(name, IO.Compression.CompressionLevel.Optimal)
-                use entryStream = entry.Open()
-                do! fileStream.CopyToAsync(entryStream)
+                try
+                    use! fileStream = file()
+                    let entry = zip.CreateEntry(name, IO.Compression.CompressionLevel.Optimal)
+                    use entryStream = entry.Open()
+                    do! fileStream.CopyToAsync(entryStream)
+                with error ->
+                    printf "Load of file %s failed: %s" name error.Message
             return ()
         })
         "flame", (fun args files output -> task {
             let stacks = ResizeArray()
             for file, _name in files do
-                use! fileStream = file()
-                stacks.Add( parseStacks fileStream)
+                try
+                    use! fileStream = file()
+                    stacks.Add( parseStacks fileStream)
+                with error ->
+                    printf "Load of file %s failed: %s" _name error.Message
             let allStacks = mergeStacks stacks
             do! getFlameGraph args allStacks output
         })
