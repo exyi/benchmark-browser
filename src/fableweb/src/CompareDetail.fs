@@ -140,7 +140,14 @@ with
             { Comparison = comparison; Base = lbase; Target = ltarget; BaseDescription = dbase; TargetDescription = dtarget }
         )
     member model.GetPairs settings =
-        let aMap = model.Base |> Seq.map (fun x -> createMappingKey x.Data, x) |> Map.ofSeq
+        let aMap =
+            model.Base
+            |> Seq.groupBy (fun x -> createMappingKey x.Data)
+            |> Seq.choose (fun (key, values) ->
+                if Seq.length values <> 1 then None
+                else Some (key, Seq.exactlyOne values)
+            )
+            |> Map.ofSeq
         let pairs = model.Target |> Seq.choose (fun x -> Map.tryFind (createMappingKey x.Data) aMap |> Option.map (fun a -> a, x)) |> Seq.toArray
         pairs
         |> Array.filter (fun (row, _) ->

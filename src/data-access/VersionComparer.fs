@@ -20,8 +20,18 @@ let compareVersions (options: ComparisonOptions) (a: WorkerSubmission seq) (b: W
     let createMappingKey (s: WorkerSubmission) =
         s.TaskName, s.Environment |> options.Environment.FilterMap, s.TaskParameters
 
-    let aMap = a |> Seq.map (fun x -> createMappingKey x, x) |> Map.ofSeq
-    let pairs = b |> Seq.choose (fun x -> Map.tryFind (createMappingKey x) aMap |> Option.map (fun a -> a, x)) |> Seq.toArray
+    let pairs =
+        let aMap =
+            a
+            |> Seq.groupBy (createMappingKey)
+            |> Seq.choose (fun (key, values) ->
+                if Seq.length values <> 1 then None
+                else Some (key, Seq.exactlyOne values)
+            )
+            |> Map.ofSeq
+        b
+        |> Seq.choose (fun x -> Map.tryFind (createMappingKey x) aMap |> Option.map (fun a -> a, x))
+        |> Seq.toArray
     let groups = getGroups pairs
 
     let computeBasicStats s =
