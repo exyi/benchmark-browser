@@ -36,11 +36,14 @@ let compareVersions (options: ComparisonOptions) (a: WorkerSubmission seq) (b: W
 
     let computeBasicStats s =
         let s = Seq.toArray s
-        { CommitRelativePerformance.AvgTime = Array.average s; MinTime = Array.min s; MaxTime = Array.max s; Count = Array.length s }
+        if s.Length = 0 then
+            { CommitRelativePerformance.AvgTime = 0.; MinTime = 0.; MaxTime = 0.; Count = 0 }
+        else
+            { CommitRelativePerformance.AvgTime = Array.average s; MinTime = Array.min s; MaxTime = Array.max s; Count = Array.length s }
 
     let computeSummary getTheNumber pairs =
         // compute avg of relative change
-        pairs |> Seq.choose (fun (a, b) -> Option.map2 (/) (getTheNumber a) (getTheNumber b)) |> computeBasicStats
+        pairs |> Seq.choose (fun (a, b) -> Option.map2 (/) (getTheNumber a) (getTheNumber b)) |> Seq.filter (fun x -> x < Double.PositiveInfinity && x > Double.NegativeInfinity) |> computeBasicStats
     let columns =
 
         let allCols = pairs |> Seq.collect(fun (a, b) -> [a; b]) |> Seq.collect (fun a -> a.Results |> Map.toSeq |> Seq.map fst) |> Seq.distinct |> Seq.filter (fun a -> a.StartsWith("Column.")) |> Seq.toList
