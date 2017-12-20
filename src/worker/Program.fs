@@ -246,6 +246,8 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
         for KeyValue (propName, v) in (columns) do
             if propName.StartsWith "Job." then
                 environment.Add (propName, v.Value<string>())
+            else if v.Value<string>() = "NaN" || v.Value<string>() = "N/A" then
+                () // ignore not availables
             else
                 let legend = globalJson.["Columns"].[propName] :?> JObject
                 match legend.["UnitType"].Value<string>() with
