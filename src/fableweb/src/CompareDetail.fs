@@ -127,29 +127,33 @@ let private cmpOptions = ComparisonOptions.Default
 let private createMappingKey (s: WorkerSubmission) =
     s.TaskName, s.Environment |> cmpOptions.Environment.FilterMap, s.TaskParameters
 
-type ComparisonData = {
-    Comparison: VersionComparisonSummary
-    Base: BenchmarkReport []
-    Target: BenchmarkReport []
-    BaseDescription: ReportGroupDetails
-    TargetDescription: ReportGroupDetails
-}
-with
-    static member Load (vA, vB) =
-        ApiClient.loadComparison vA vB |> Promise.map (fun (comparison, lbase, ltarget, dbase, dtarget) ->
-            { Comparison = comparison; Base = lbase; Target = ltarget; BaseDescription = dbase; TargetDescription = dtarget }
-        )
-    member model.GetPairs settings =
+type ComparisonData(comparison, b, t, bDesc, tDesc) as x = class
+    let preparedPairs = lazy (
         let aMap =
-            model.Base
+            x.Base
             |> Seq.groupBy (fun x -> createMappingKey x.Data)
             |> Seq.choose (fun (key, values) ->
                 if Seq.length values <> 1 then None
                 else Some (key, Seq.exactlyOne values)
             )
             |> Map.ofSeq
-        let pairs = model.Target |> Seq.choose (fun x -> Map.tryFind (createMappingKey x.Data) aMap |> Option.map (fun a -> a, x)) |> Seq.toArray
-        pairs
+        x.Target |> Seq.choose (fun x -> Map.tryFind (createMappingKey x.Data) aMap |> Option.map (fun a -> a, x)) |> Seq.toArray
+    )
+
+
+    member x.Comparison: VersionComparisonSummary = comparison
+    member x.Base: BenchmarkReport [] = b
+    member x.Target: BenchmarkReport [] = t
+    member x.BaseDescription: ReportGroupDetails = bDesc
+    member x.TargetDescription: ReportGroupDetails = tDesc
+
+    static member Load (vA, vB) =
+        ApiClient.loadComparison vA vB |> Promise.map (fun (comparison, lbase, ltarget, dbase, dtarget) ->
+            ComparisonData(comparison, lbase, ltarget, dbase, dtarget)
+        )
+
+    member x.GetPairs settings =
+        preparedPairs.Value
         |> Array.filter (fun (row, _) ->
             settings.Filters |> Seq.forall (fun (col, filter) -> col.Getter.Eval row.Data |> Option.map filter.Predicate |> Option.defaultValue false)
         )
@@ -170,6 +174,7 @@ with
                 sortFn (fun (rA, rB) -> Option.map2 getKey (column.Getter.Eval rA.Data) (column.Getter.Eval rB.Data))
             ) |> Option.defaultValue id
         )
+end
 
 
 type Model = {
@@ -348,30 +353,44 @@ let private setSettingsFilter settingsDispatch column replaceFilter value =
         { m with Filters = newFilters }, Cmd.none
     ))
 
-let viewResultsGrid (tuples: (BenchmarkReport * BenchmarkReport) array) (settings: GridLayoutSettings) settingsDispatch =
-    let rows = tuples |> Seq.map (fun (a, b) ->
-        let cols = settings.Columns |> Array.map (fun c ->
-            let colA = c.Getter.Eval a.Data
-            let colB = c.Getter.Eval b.Data
+let private cellCache = Dictionary<TestResultValue option * TestResultValue option, ReactElement>()
+let mutable private lastUrl = ""
+let private renderValue a b =
+    match cellCache.TryGetValue((a, b)) with
+    | (true, e) -> e
+    | (false, _) ->
+        let content =
+            match (a, b) with
+            | (None, None) -> [ str "" ]
+            | (Some a, None) -> [ viewValue a; str " (REMOVED)" ]
+            | (None, Some a) -> [ viewValue a; str " (ADDED)" ]
+            | (Some a, Some b) ->
+                match TestResultValue.GetComparable a, TestResultValue.GetComparable b with
+                | _ when a = b ->
+                    [ viewValue a; ]
+                | (Some cmpA, Some cmpB) ->
+                    [ viewValue b; str " "; ProjectDashboard.displayPercents (cmpA / cmpB) (sprintf "%g -> %g" cmpA cmpB) ]
+                | _ ->
+                    [ viewValue a; str " => "; viewValue b ]
+        let cell = td [ ClassName "td" ] content
+        cellCache.Add((a, b), cell)
+        cell
 
-            let content =
-                match (colA, colB) with
-                | (None, None) -> [ str "" ]
-                | (Some a, None) -> [ viewValue a; str " (REMOVED)" ]
-                | (None, Some a) -> [ viewValue a; str " (ADDED)" ]
-                | (Some a, Some b) ->
-                    match TestResultValue.GetComparable a, TestResultValue.GetComparable b with
-                    | _ when a = b ->
-                        [ viewValue a; ]
-                    | (Some cmpA, Some cmpB) ->
-                        [ viewValue b; str " "; ProjectDashboard.displayPercents (cmpA / cmpB) (sprintf "%g -> %g" cmpA cmpB) ]
-                    | _ ->
-                        [ viewValue a; str " => "; viewValue b ]
-            td [ ClassName "td" ] content
+let viewResultsGrid (tuples: (BenchmarkReport * BenchmarkReport) array) (settings: GridLayoutSettings) settingsDispatch =
+    if Fable.Import.Browser.location.href <> lastUrl then
+        lastUrl <- Fable.Import.Browser.location.href
+        cellCache.Clear()
+    let gridRow =
+        Elmish.React.Common.lazyView (fun (a : BenchmarkReport, b: BenchmarkReport) ->
+            let cols = settings.Columns |> Array.map (fun c ->
+                let colA = c.Getter.Eval a.Data
+                let colB = c.Getter.Eval b.Data
+                renderValue colA colB
+            )
+            tr [ ClassName "tr" ] (Seq.toList cols)
         )
 
-        tr [ ClassName "tr" ] (Seq.toList cols)
-    )
+    let rows = tuples |> Seq.map (gridRow)
 
     let removeColumn column =
         closeDropdown ()
