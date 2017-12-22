@@ -380,15 +380,15 @@ let viewResultsGrid (tuples: (BenchmarkReport * BenchmarkReport) array) (setting
     if Fable.Import.Browser.location.href <> lastUrl then
         lastUrl <- Fable.Import.Browser.location.href
         cellCache.Clear()
-    let gridRow =
-        Elmish.React.Common.lazyView (fun (a : BenchmarkReport, b: BenchmarkReport) ->
+    let gridRow tuple =
+        Elmish.React.Common.lazyView (fun (settings, (a : BenchmarkReport, b: BenchmarkReport)) ->
             let cols = settings.Columns |> Array.map (fun c ->
                 let colA = c.Getter.Eval a.Data
                 let colB = c.Getter.Eval b.Data
                 renderValue colA colB
             )
             tr [ ClassName "tr" ] (Seq.toList cols)
-        )
+        ) (settings, tuple)
 
     let rows = tuples |> Seq.map (gridRow)
 
