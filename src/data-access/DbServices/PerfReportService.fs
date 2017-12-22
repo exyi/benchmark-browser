@@ -182,19 +182,24 @@ let getHomeModel (s:IDocumentSession) = task {
 let private getVersionData =
     let cache : Collections.Concurrent.ConcurrentDictionary<(string * int), Task<IReadOnlyList<BenchmarkReport>>> = Collections.Concurrent.ConcurrentDictionary()
     fun (commit: string) (reportCount: int option) (session:IDocumentSession) ->
-        let load _ = task {
-            let! q = (query {
+        let query = lazy (query {
                         for d in session.Query<BenchmarkReport>() do
                         where (d.Data.ProjectVersion = commit)
-                     }).ToListAsync()
+                     })
+        let load _ = task {
+            let! q = query.Value.ToListAsync()
             return q
+        }
+        let queryCount _ = task {
+            return! query.Value.CountAsync()
         }
         match reportCount with
         | Some reportCount -> cache.GetOrAdd((commit, reportCount), load)
-        | None ->
-            let task = load ()
-            task.ContinueWith(fun (t: Task<IReadOnlyList<_>>) -> cache.TryAdd((commit, t.Result.Count), t)) |> ignore
-            task
+        | None -> task {
+            // usually, it does not change and it's much faster to query only the count than load many pretty big json documents
+            let! reportCount = queryCount ()
+            return! cache.GetOrAdd((commit, reportCount), load)
+        }
 
 let private getVersionComparison a b (s:IDocumentSession) = task {
     use s = s.DocumentStore.LightweightSession()
