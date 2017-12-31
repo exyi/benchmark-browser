@@ -151,7 +151,7 @@ let storeFile fileId t tags (stream: IO.Stream) (s: IDocumentSession) = task {
         FilePath = fileName
         ArchiveInfo = FileArchiveInfo.GZipped
         Type = t
-        DateCreated = DateTime.Now
+        DateCreated = DateTime.UtcNow
         Tags = tags
          }
     s.Insert entity
