@@ -383,7 +383,7 @@ let private getCommitDetails cloneUrls commit =
     let repo = RepoManager.getRepoStructureOfMany repoTmpPath cloneUrls
     let repo =
         if repo.Commits.ContainsKey commit |> not then
-            for c in cloneUrls do RepoManager.flushRepoCache repoTmpPath d
+            for c in cloneUrls do RepoManager.flushRepoCache repoTmpPath c
             RepoManager.getRepoStructureOfMany repoTmpPath cloneUrls
         else repo
     repo.Commits.[commit]
