@@ -164,11 +164,16 @@ with static member Create commits heads =
      }
 
 
-let repoStructureCache =
+let private repoStructureCache =
     let opt = MemoryCacheOptions()
     opt.ExpirationScanFrequency <- TimeSpan.FromHours(1.5)
     opt.CompactionPercentage <- 1.0
     new MemoryCache(opt)
+
+let flushRepoCache tmpPath cloneUrl =
+    hackSetSomeInternalShit()
+    let repo = getUpToDate tmpPath cloneUrl (TimeSpan.Zero)
+    repoStructureCache.Remove(repo)
 
 let getRepoStructure tmpPath cloneUrl =
     hackSetSomeInternalShit()

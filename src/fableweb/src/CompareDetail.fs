@@ -369,7 +369,7 @@ let private renderValue a b =
                 | _ when a = b ->
                     [ viewValue a; ]
                 | (Some cmpA, Some cmpB) ->
-                    [ viewValue b; str " "; ProjectDashboard.displayPercents (cmpA / cmpB) (sprintf "%g -> %g" cmpA cmpB) ]
+                    [ viewValue a; str " "; ProjectDashboard.displayPercents (cmpA / cmpB) (sprintf "%g -> %g" cmpA cmpB) ]
                 | _ ->
                     [ viewValue a; str " => "; viewValue b ]
         let cell = td [ ClassName "td" ] content

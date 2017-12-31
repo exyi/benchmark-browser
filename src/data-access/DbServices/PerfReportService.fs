@@ -381,6 +381,11 @@ let getTestDefDashboard (uid: Guid) (pid:string) (s: IDocumentSession) = task {
 
 let private getCommitDetails cloneUrls commit =
     let repo = RepoManager.getRepoStructureOfMany repoTmpPath cloneUrls
+    let repo =
+        if repo.Commits.ContainsKey commit |> not then
+            for c in cloneUrls do RepoManager.flushRepoCache repoTmpPath d
+            RepoManager.getRepoStructureOfMany repoTmpPath cloneUrls
+        else repo
     repo.Commits.[commit]
 
 let getReportGroups a session = task {
@@ -388,6 +393,8 @@ let getReportGroups a session = task {
     | ReportGroupSelector.Version commit ->
         let! data = getVersionData commit None session
         let repos = data |> Seq.map (fun x -> x.Data.ProjectCloneUrl) |> Seq.distinct |> Seq.map Uri |> Seq.toArray
+        if Array.isEmpty repos then
+            failwithf "No data for commit %s" commit
         let commitDetails = getCommitDetails repos commit
         return data, (ReportGroupDetails.Commits [|commitDetails|])
 }
