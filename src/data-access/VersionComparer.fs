@@ -11,6 +11,7 @@ let private getGroups allPairs =
         byTestName |> Array.map (fun (n, x) -> "Test - " + n, x) |> Array.filter (fun (_, x) -> x.Length > 1)
         byTestClass |> Array.map (fun (n, x) -> "Class - " + n, x)
     ]
+    |> Array.distinctBy (fun (name, tests) -> tests)
     |> Map.ofArray
 
 let compareVersions (options: ComparisonOptions) (a: WorkerSubmission seq) (b: WorkerSubmission seq) =

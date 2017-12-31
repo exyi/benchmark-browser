@@ -7,3 +7,5 @@ obj/
 
 src/api/blobStorage
 src/api/palette.map
+
+/src/.idea
