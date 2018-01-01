@@ -32,7 +32,7 @@ let private cloneOrPullRepository repoPath (cloneUrl:Uri) (maxAge: TimeSpan) =
         | (true, date) when (date + maxAge) > DateTime.UtcNow -> ()
         | _ ->
             printfn "Fetching %s -> %s" (string cloneUrl) repoPath
-            if Git.CommandHelper.directRunGitCommand repoPath "fetch --all" |> not then failwithf "Could not fetch %s" (cloneUrl.ToString())
+            if Git.CommandHelper.directRunGitCommand repoPath "fetch --all --recurse-submodules" |> not then failwithf "Could not fetch %s" (cloneUrl.ToString())
             Git.FileStatus.cleanWorkingCopy repoPath
 
             lastRepoFetch.[repoPath] <- DateTime.UtcNow
