@@ -177,7 +177,13 @@ type BenchmarkData = {
     ResultLegend: Map<string, string>
     // LocalAttachements: Map<string, string>
     Data: WorkerSubmission []
-}
+} with
+    static member Empty = { BenchmarkData.Data = [||]; Attachements = [||]; ResultLegend = Map.empty }
+    static member Append a b =
+        { Attachements = Array.append a.Attachements b.Attachements
+          Data = Array.append a.Data b.Data
+          ResultLegend = Map.ofSeq (Seq.append (Map.toSeq a.ResultLegend) (Map.toSeq b.ResultLegend) |> Seq.distinct)
+        }
 
 let getFileTags (file: string) =
     let specialType =
@@ -292,8 +298,8 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
     }
 
 let benchmarkDotNet_processStuff emptyReport (extract: BenchmarkDotNetLogExtraction) =
-    let jsonFile = extract.OutFiles |> Seq.tryFind (fun f -> f.EndsWith ".json")
-    let result = jsonFile |> Option.map (benchmarkDotNet_parseJson emptyReport) |> Option.defaultValue { BenchmarkData.Data = [||]; Attachements = [||]; ResultLegend = Map.empty }
+    let jsonFiles = extract.OutFiles |> Seq.filter (fun f -> f.EndsWith ".json")
+    let result = jsonFiles |> Seq.map (benchmarkDotNet_parseJson emptyReport) |> Seq.fold BenchmarkData.Append BenchmarkData.Empty
 
     { result with Attachements = Array.concat [ result.Attachements; extract.OutFiles |> Seq.map (fun f -> f, Guid.NewGuid(), (Array.append (getFileTags f) [| "global"; "BdnReport" |])) |> Seq.toArray ] }
 
