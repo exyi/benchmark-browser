@@ -157,6 +157,6 @@ type ComparisonOptions = {
     Environment: IncludeOrExcludeOption
 }
 with
-    static member Default = { ComparisonOptions.Environment = IncludeOrExcludeOption.IncludeExcept [||] }
+    static member Default = { ComparisonOptions.Environment = IncludeOrExcludeOption.ExcludeExcept [|"Job.Server"; "Job.Jit"|] }
 
 
