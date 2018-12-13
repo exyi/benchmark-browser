@@ -205,6 +205,12 @@ let getFileTags (file: string) =
         |] |> Array.choose id
     tags
 
+let private tryParseNumber string =
+    match Double.TryParse string with
+    | (false, _) when string = "-" -> Some 0.0 // sometimes BenchmarkDotNet uses - instead of 0
+    | (false, _) -> None
+    | (true, a) -> Some a
+
 let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
     let globalJson = JObject.Parse(IO.File.ReadAllText(filePath))
 
@@ -250,35 +256,43 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
 
         let columns = json.["Columns"] :?> JObject
         for KeyValue (propName, v) in (columns) do
-            if propName.StartsWith "Job." then
-                environment.Add (propName, v.Value<string>())
-            else if v.Value<string>() = "NaN" || v.Value<string>() = "N/A" then
-                () // ignore not availables
-            else
-                let legend = globalJson.["Columns"].[propName] :?> JObject
-                match legend.["UnitType"].Value<string>() with
-                | "Dimensionless" ->
-                    if propName.Contains "TimeFraction" then
-                        let isPercent = legend.["Legend"].Value<string>().Contains "%"
-                        let value = (v.Value<string>() |> Double.Parse) / (if isPercent then 100.0 else 1.0)
-                        results.Add("Columns." + propName, TestResultValue.Fraction (value, Some "Statistics.Mean"))
-                    if legend.["IsNumeric"].Value<bool>() then
-                        results.Add("Columns." + propName, TestResultValue.Number (v.Value<string>() |> Double.Parse, None))
-                    else if legend.["IsFileName"].Value<bool>() then
-                        let fileGuid = Guid.NewGuid()
-                        let fileName = v.Value<string>()
-                        let tags = getFileTags fileName
-                        files.Add (fileName, fileGuid, tags)
-                        results.Add("Columns." + propName, TestResultValue.AttachedFile (fileGuid, tags))
-                    else
-                        results.Add("Columns." + propName, TestResultValue.Anything <| v.Value<string>())
-                | "TimeUnit" ->
-                    let micros = v.Value<string>() |> Double.Parse
-                    results.Add("Columns." + propName, TestResultValue.Time <| TimeSpan(micros * 10.0 |> int64))
-                | "SizeUnit" ->
-                    let bytes = v.Value<string>() |> Double.Parse
-                    results.Add("Columns." + propName, TestResultValue.ByteSize bytes)
-                | _ -> failwith ""
+            try
+                if propName.StartsWith "Job." then
+                    environment.Add (propName, v.Value<string>())
+                else if v.Value<string>() = "NaN" || v.Value<string>() = "N/A" then
+                    () // ignore not availables
+                else
+                    let legend = globalJson.["Columns"].[propName] :?> JObject
+                    let numericValue =
+                        if v.Type = JTokenType.String then v.Value<string>() |> tryParseNumber
+                        else if v.Type = JTokenType.Float then v.Value<double>() |> Some
+                        else None
+                    match legend.["UnitType"].Value<string>() with
+                    | "Dimensionless" ->
+                        if propName.Contains "TimeFraction" && numericValue.IsSome then
+                            let isPercent = legend.["Legend"].Value<string>().Contains "%"
+                            let value = numericValue.Value / (if isPercent then 100.0 else 1.0)
+                            results.Add("Columns." + propName, TestResultValue.Fraction (value, Some "Statistics.Mean"))
+                        else if legend.["IsNumeric"].Value<bool>() && numericValue.IsSome then
+                            results.Add("Columns." + propName, TestResultValue.Number (numericValue.Value, None))
+                        else if legend.["IsFileName"].Value<bool>() then
+                            let fileGuid = Guid.NewGuid()
+                            let fileName = v.Value<string>()
+                            let tags = getFileTags fileName
+                            files.Add (fileName, fileGuid, tags)
+                            results.Add("Columns." + propName, TestResultValue.AttachedFile (fileGuid, tags))
+                        else
+                            results.Add("Columns." + propName, TestResultValue.Anything <| v.Value<string>())
+                    | "TimeUnit" ->
+                        let micros = v.Value<string>() |> Double.Parse
+                        results.Add("Columns." + propName, TestResultValue.Time <| TimeSpan(micros * 10.0 |> int64))
+                    | "SizeUnit" ->
+                        let bytes = v.Value<string>() |> Double.Parse
+                        results.Add("Columns." + propName, TestResultValue.ByteSize bytes)
+                    | _ -> failwith ""
+            with e ->
+                // Don't blow up everything, just print what was wrong
+                printfn "Error while processing column %s: %O -- %A" propName v e
 
         let parameters =
             match json.["Parameters"] with
