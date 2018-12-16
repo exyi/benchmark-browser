@@ -21,6 +21,8 @@ module Program =
             // .UseUrls("http://*:5000")
             .UseKestrel(fun options ->
                 options.Listen(IPAddress.Any, 5000)
+                options.Limits.MaxRequestBodySize <- Nullable() // disable limit for POST request payload size
+                options.Limits.MaxRequestLineSize <- 65536 // since the UI is hacking with URI size a bit, we also increase it
                 if IO.File.Exists "certificate.pfx" then
                     printfn "Running https on port 5433"
                     options.Listen(IPAddress.Any, 5443, fun loptions ->

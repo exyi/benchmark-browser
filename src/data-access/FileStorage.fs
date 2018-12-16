@@ -110,17 +110,17 @@ let archivers : Map<string, (Map<string, string[]> -> ((unit -> Task<IO.Stream>)
                     use entryStream = entry.Open()
                     do! fileStream.CopyToAsync(entryStream)
                 with error ->
-                    printf "Load of file %s failed: %s" name error.Message
+                    printfn "Load of file %s failed: %O" name error
             return ()
         })
         "flame", (fun args files output -> task {
             let stacks = ResizeArray()
-            for file, _name in files do
+            for file, name in files do
                 try
                     use! fileStream = file()
                     stacks.Add( parseStacks fileStream)
                 with error ->
-                    printf "Load of file %s failed: %s" _name error.Message
+                    printfn "Load of file %s failed: %O" name error
             let allStacks = mergeStacks stacks
             do! getFlameGraph args allStacks output
         })
