@@ -190,7 +190,7 @@ let getFileTags (file: string) =
         if file.EndsWith(".stacks") || file.EndsWith(".stacks.gz") then "_stacks"
         else ""
 
-    printf "Uploading file%s %s: " specialType file
+    printfn "Registered file file%s %s" specialType file
 
     let tags =
         [|
@@ -283,16 +283,16 @@ let benchmarkDotNet_parseJson emptySubmission filePath : BenchmarkData =
                             results.Add("Columns." + propName, TestResultValue.AttachedFile (fileGuid, tags))
                         else
                             results.Add("Columns." + propName, TestResultValue.Anything <| v.Value<string>())
-                    | "TimeUnit" ->
+                    | "TimeUnit" | "Time" ->
                         let micros = v.Value<string>() |> Double.Parse
                         results.Add("Columns." + propName, TestResultValue.Time <| TimeSpan(micros * 10.0 |> int64))
-                    | "SizeUnit" ->
+                    | "SizeUnit" | "Size" ->
                         let bytes = v.Value<string>() |> Double.Parse
                         results.Add("Columns." + propName, TestResultValue.ByteSize bytes)
-                    | _ -> failwith ""
+                    | unknownType -> failwith "Unknown unit type: %s" unknownType
             with e ->
                 // Don't blow up everything, just print what was wrong
-                printfn "Error while processing column %s: %O -- %A" propName v e
+                printfn "Error while processing column %s: %O -- %O" propName v e
 
         let parameters =
             match json.["Parameters"] with
